@@ -88,7 +88,6 @@
     <thead>
         <tr>
             <th>Pool</th>
-            <th>Address</th>
             <th>Swim Type</th>
             <th>Day</th>
             <th on:click={sortSchedulesByStartTime} style="cursor: pointer;">
@@ -100,8 +99,7 @@
     <tbody>
         {#each schedules as schedule}
             <tr>
-                <td>{schedule.pool}</td>
-                <td>{schedule.address}</td>
+                <td><a href="https://www.google.com/maps/search/?api=1&query={schedule.address}" target="_blank">{schedule.pool}</a></td>
                 <td>{schedule.swim_type}</td>
                 <td>{schedule.day}</td>
                 <td>{schedule.start_time}</td>

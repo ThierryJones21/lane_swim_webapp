@@ -6,29 +6,7 @@ from sqlalchemy import create_engine, Column, String, Time, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-pool_names = {
-    'bob-macquarrie-recreation-complex-orleans': "1490 Youville Drive, Ottawa, ON K1C 2X8, Canada",
-    'brewer-pool-and-arena': "100 Brewer Way, Ottawa, ON K1S 5T1, Canada",
-    'canterbury-recreation-complex': "2185 Arch Street, Ottawa, ON K1G 2H5, Canada",
-    'cardelrec-recreation-complex-goulbourn': "1500 Shea Road, Ottawa, ON K2S 0B2, Canada",
-    'champagne-fitness-centre': "321 King Edward Avenue, Ottawa, ON K1N 7M5, Canada",
-    'deborah-anne-kirwan-pool': "1300 Kitchener Avenue, Ottawa, ON K1V 6W2, Canada",
-    'francois-dupuis-recreation-centre': "2263 Portobello Boulevard, Ottawa, ON K4A 0X3, Canada",
-    'jack-purcell-community-centre': "320 Jack Purcell Lane, Ottawa, ON K2P 2J5, Canada",
-    'kanata-leisure-centre-and-wave-pool': "70 Aird Place, Ottawa, ON K2L 4C9, Canada",
-    'lowertown-community-centre-and-pool': "40 Cobourg Street, Ottawa, ON K1N 8Z6, Canada",
-    'minto-recreation-complex-barrhaven': "3500 Cambrian Road, Ottawa, ON K2J 0V1, Canada",
-    'nepean-sportsplex': "1701 Woodroffe Avenue, Ottawa, ON K2G 1W2, Canada",
-    'pinecrest-recreation-complex': "2250 Torquay Avenue, Ottawa, ON K2C 1J3, Canada",
-    'plant-recreation-centre': "930 Somerset Street West, Ottawa, ON K1R 6R9, Canada",
-    'ray-friel-recreation-complex': "1585 Tenth Line Road, Ottawa, ON K1E 3E8, Canada",
-    'richcraft-recreation-complex-kanata': "4101 Innovation Drive, Ottawa, ON K2K 0J3, Canada",
-    'sawmill-creek-community-centre-and-pool': "3380 D’Aoust Avenue, Ottawa, ON K1T 1R5, Canada",
-    'splash-wave-pool': "2040 Ogilvie Road, Ottawa, ON K1J 7N8, Canada",
-    'st-laurent-complex': "525 Côté Street, Ottawa, ON K1K 0Z8, Canada",
-    'walter-baker-sports-centre': "100 Malvern Drive, Ottawa, ON K2J 2G5, Canada"
-}
-
+pool_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?place_facets%5B0%5D=place_type%3A4285"
 url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/"
 
 # Define the base class for SQLAlchemy
@@ -45,6 +23,41 @@ class LaneSwimSchedule(Base):
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+    
+def get_pools():
+    pool_data = {}
+    response = requests.get(pool_name_url)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Find the table within the div with class "table-responsive"
+        table_div = soup.find("div", class_="table-responsive")
+        table = table_div.find("table") if table_div else None
+        
+        if table:
+            for row in table.find_all('tr'):
+                if row.find('td'):
+                    # Find the pool name link and address container
+                    name_tag = row.find('td', class_='views-field views-field-title').find('a')
+                    address_tag = row.find('td', class_='views-field views-field-field-address').find('p', class_='address')
+
+                    if name_tag and address_tag:
+                        # Get pool name
+                        pool_url = name_tag['href']
+                        pool_name = pool_url.split('/')[-1]
+                        
+                        # Get address details
+                        address_line = address_tag.find('span', class_='address-line1').get_text(strip=True)
+                        locality = address_tag.find('span', class_='locality').get_text(strip=True)
+                        admin_area = address_tag.find('span', class_='administrative-area').get_text(strip=True)
+                        postal_code = address_tag.find('span', class_='postal-code').get_text(strip=True)
+                        
+                        # Combine address components into a single string
+                        full_address = f"{address_line}, {locality}, {admin_area} {postal_code}, Canada"
+                        
+                        # Add to dictionary
+                        pool_data[pool_name] = full_address
+    return pool_data
 
 def parse_schedule_time(schedule_time):
     """Parse schedule times into start and end datetime objects."""
@@ -100,77 +113,100 @@ def extract_lane_swim_rows(table, pool_name, address):
     lane_swim_schedules = []
     # Iterate through each row in the table body
     for row in table.find_all("tr"):
-        header = row.find("th")  # Get the header cell
-        if header and "Lane swim" in header.text:  # Check if "Lane swim" is in the header text
-            swim_type = header.text.strip().replace('\xa0', ' ').replace("\n", " ").replace("\t", " ").replace('–', '-')  # Get the swim type
-            cells = row.find_all("td")  # Get all the data cells in the row
-            days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            
-            for day, cell in zip(days, cells):
-                schedule_time = cell.text.strip()
-                if schedule_time and schedule_time.lower() != 'n/a':  # Only consider valid times
-                    print(pool_name)
-                    print(day)
-                    start_end_times = parse_schedule_time(schedule_time)
-                    for start_end in start_end_times:
-                        print(start_end)
-                        lane_swim_schedules.append({
-                            'Pool': pool_name,
-                            'Address': address, 
-                            'Swim Type': swim_type,
-                            'Day': day,
-                            'Start Time': start_end[0],  # Start time from tuple
-                            'End Time': start_end[1]     # End time from tuple
-                        })
+        header = row.find("th")  # Get the header cell 
+        if header:
+            # If &nbsp; or any other unrecognized characters \u202f in cell to write new line in html clean out
+            header = header.text.encode("utf-8", "ignore").decode("utf-8")
+            header = header.replace("\u202f", " ").replace("\xa0", " ") 
+            if "lane swim" in header.lower():  # Check if "Lane swim" is in the header text any type convert to lower 
+                swim_type = header.strip().replace("\n", " ").replace("\t", " ").replace('–', '-')  
+                cells = row.find_all("td")  # Get all the data cells in the row
+                days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']                
+                for day, cell in zip(days, cells):
+                    schedule_time = cell.text.encode("utf-8", "ignore").decode("utf-8")
+                    schedule_time = schedule_time.replace("\u202f", " ").replace("\xa0", " ") 
+                    if schedule_time and schedule_time.lower() != 'n/a':  # Only consider valid times
+                        start_end_times = parse_schedule_time(schedule_time)
+                        for start_end in start_end_times:
+                            print(start_end)
+                            lane_swim_schedules.append({
+                                'Pool': pool_name,
+                                'Address': address, 
+                                'Swim Type': swim_type,
+                                'Day': day,
+                                'Start Time': start_end[0],  # Start time from tuple
+                                'End Time': start_end[1]     # End time from tuple
+                            })
+                else:
+                    print("header laneswim not found")
     return lane_swim_schedules
 
-# List to hold all schedules
-all_lane_swim_schedules = []
-# Iterate through each pool name
-for pool_name, address in pool_names.items():
-    response = requests.get(url + pool_name)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
+def main():
+    # List to hold all schedules
+    all_lane_swim_schedules = []
+    
+    # Dynamically web scrape pool names and url links to each one
+    pool_names = get_pools()
+    
+    # Iterate through each pool name
+    for pool_name, address in pool_names.items():
+        response = requests.get(url + pool_name)
         
-        # Find the table within the div with class "table-responsive"
-        table_div = soup.find("div", class_="table-responsive")
-        table = table_div.find("table") if table_div else None
-        
-        if table:
-            lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address)
-            all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
+        if response.status_code == 200:
+            response.encoding = 'utf-8'
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Find the table within the div with class "table-responsive"
+            table_div = soup.find("div", class_="table-responsive")
+            table = table_div.find("table") if table_div else None
+            if table:
+                lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address)
+                print(lane_swim_schedules)
+                all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
+            else:
+                print(f"No schedule table found for {pool_name.replace('-', ' ').title()}.")
         else:
-            print(f"No schedule table found for {pool_name.replace('-', ' ').title()}.")
+            print(f"Failed to retrieve data for {pool_name.replace('-', ' ').title()}. Status code: {response.status_code}")
+    
+    # If any table are found
+    if lane_swim_schedules:
+        df = pd.DataFrame(all_lane_swim_schedules)
+        df['Start Time'] = pd.to_datetime(df['Start Time'], format='%I:%M %p', errors='coerce').dt.time
+        df['End Time'] = pd.to_datetime(df['End Time'], format='%I:%M %p', errors='coerce').dt.time
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        df['Day'] = pd.Categorical(df['Day'], categories=day_order, ordered=True)
+        df.sort_values(by=['Day', 'Pool', 'Start Time'], inplace=True)
+
+        # Display the sorted DataFrame without index
+        print(df.to_string(index=False))
+
+
+        """Push df to sqllite database"""
+        engine = create_engine('sqlite:///lane_swim_database.db')
+        Base.metadata.create_all(engine)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        # overwrite previous data
+        session.query(LaneSwimSchedule).delete()
+        session.commit()
+
+        for index, row in df.iterrows():
+            swim_schedule = LaneSwimSchedule(
+                pool=row['Pool'],
+                address=row['Address'],
+                swim_type=row['Swim Type'],
+                day=row['Day'],
+                start_time=row['Start Time'],
+                end_time=row['End Time']
+            )
+            session.add(swim_schedule)
+        session.commit()
+        session.close()
+
+        print("Data inserted into the database successfully.")
     else:
-        print(f"Failed to retrieve data for {pool_name.replace('-', ' ').title()}. Status code: {response.status_code}")
-
-df = pd.DataFrame(all_lane_swim_schedules)
-df['Start Time'] = pd.to_datetime(df['Start Time'], format='%I:%M %p', errors='coerce').dt.time
-df['End Time'] = pd.to_datetime(df['End Time'], format='%I:%M %p', errors='coerce').dt.time
-day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-df['Day'] = pd.Categorical(df['Day'], categories=day_order, ordered=True)
-df.sort_values(by=['Day', 'Pool', 'Start Time'], inplace=True)
-
-# Display the sorted DataFrame without index
-print(df.to_string(index=False))
-
-
-"""Push df to sqllite database"""
-engine = create_engine('sqlite:///lane_swim_database.db')
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-session = Session()
-for index, row in df.iterrows():
-    swim_schedule = LaneSwimSchedule(
-        pool=row['Pool'],
-        address=row['Address'],
-        swim_type=row['Swim Type'],
-        day=row['Day'],
-        start_time=row['Start Time'],
-        end_time=row['End Time']
-    )
-    session.add(swim_schedule)
-session.commit()
-session.close()
-
-print("Data inserted into the database successfully.")
+        print("No tables found in any url")
+    
+main()
+# get_pools()
