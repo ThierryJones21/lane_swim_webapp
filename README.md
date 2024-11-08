@@ -20,7 +20,9 @@ Ensure both `python` and `node` are in your system path.
 
 **Clone the Repository** (if you haven't already):
    ```bash
-   git clone https://github.com/yourusername/lane-swim-scheduler.git
+   git clone https://github.com/thierryjones21/lane-swim-scheduler.git
+   ```
+   ```bash
    cd lane-swim-scheduler
    ```
 
@@ -29,6 +31,8 @@ Ensure both `python` and `node` are in your system path.
 **Install Dependencies and Run the WebScraper to get the database (.db) file**
    ```bash
    pip install -r requirements.txt
+   ```
+   ```bash
    python pool_scraper.py
    ```
 
@@ -42,7 +46,9 @@ Ensure both `python` and `node` are in your system path.
 **Install Dependencies and Run Svelte Server**
 Open a new terminal, then navigate to webapp folder. Install the node modules required to run the svelte app.
    ```bash
-   cd /lane_swim_webapp
+   cd /webapp_svelte
+   ```
+   ```bash
    npm install
    npm run dev
    ```
