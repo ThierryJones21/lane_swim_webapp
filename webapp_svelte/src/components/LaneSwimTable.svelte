@@ -10,10 +10,12 @@
     let isStartTimeSortedAsc = true;
     let pools = [];
 
+    const API_URL = import.meta.env.VITE_API_URL;
+
     // Fetching pools from the backend
     const fetchPools = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/pools');
+            const response = await axios.get(`${API_URL}/pools`);
             pools = response.data;
         } catch (error) {
             console.error('Error fetching pools:', error);
@@ -22,7 +24,7 @@
 
     const fetchSchedules = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/schedules', {
+            const response = await axios.get(`${API_URL}/schedules`, {
                 params: { 'pool[]': poolFilter, day: dayFilter, time: timeFilter }
             });
             schedules = response.data;
