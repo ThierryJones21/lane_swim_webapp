@@ -9,6 +9,16 @@
     let timeFilter = '';
     let isStartTimeSortedAsc = true;
     let pools = [];
+    let scriptLog = {};
+
+    const fetchLastRunTime = async () => {
+        try {
+            const response = await axios.get("http://127.0.0.1:5000/script-log");
+            scriptLog = response.data;
+        } catch (error) {
+            console.error('Error fetching pools:', error);
+        }
+    };
 
     // Fetching pools from the backend
     const fetchPools = async () => {
@@ -43,10 +53,15 @@
     onMount(() => {
         fetchPools(); // Fetch pools when the component mounts
         fetchSchedules(); // Fetch schedules initially
+        fetchLastRunTime();
     });
 </script>
 
 <h1>Ottawa Lane Swim Schedules</h1>
+
+<div class="script-log">
+    <p><strong>Last Updated:</strong> {scriptLog.last_run_time ? `${scriptLog.last_run_time} (Script: ${scriptLog.script_name})` : "Fetching..."}</p>
+</div>
 
 <div class="filters">
     <div class="filter-container">

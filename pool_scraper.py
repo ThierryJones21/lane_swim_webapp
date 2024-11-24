@@ -23,6 +23,13 @@ class LaneSwimSchedule(Base):
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+
+class ScriptLog(Base):
+    __tablename__ = 'script_log'
+    
+    id = Column(Integer, primary_key=True)
+    script_name = Column(String, nullable=False)
+    last_run_time = Column(String, nullable=False)
     
 def get_pools():
     pool_data = {}
@@ -202,6 +209,15 @@ def main():
             )
             session.add(swim_schedule)
         session.commit()
+        
+         # Log the script execution time
+        script_log = ScriptLog(
+            script_name="Lane Swim Scraper",
+            last_run_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        session.add(script_log)
+        session.commit()
+        
         session.close()
 
         print("Data inserted into the database successfully.")

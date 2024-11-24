@@ -5,6 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, String, Time, Integer
 from datetime import datetime, timedelta
+from sqlalchemy import desc
+
 
 Base = declarative_base()
 
@@ -18,6 +20,13 @@ class LaneSwimSchedule(Base):
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+
+class ScriptLog(Base):
+    __tablename__ = 'script_log'
+    
+    id = Column(Integer, primary_key=True)
+    script_name = Column(String, nullable=False)
+    last_run_time = Column(String, nullable=False)
 
 def parse_time(time_str):
     """Parse a time string into a time object, accommodating both 12-hour and 24-hour formats."""
@@ -92,6 +101,24 @@ def get_schedules():
                'start_time': str(sch.start_time),
                'end_time': str(sch.end_time)} for sch in schedules]
     
+    return jsonify(result)
+
+@app.route('/script-log', methods=['GET'])
+def get_script_log():
+    session = Session()
+    # Query the most recent script log entry
+    latest_log = session.query(ScriptLog).order_by(desc(ScriptLog.last_run_time)).first()
+    session.close()
+
+    if latest_log:
+        result = {
+            'script_name': latest_log.script_name,
+            'last_run_time': latest_log.last_run_time
+        }
+    else:
+        result = {
+            'message': "No script logs found."
+        }
     return jsonify(result)
 
 if __name__ == '__main__':
