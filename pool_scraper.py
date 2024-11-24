@@ -161,7 +161,7 @@ def main():
             table = table_div.find("table") if table_div else None
             if table:
                 lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address)
-                print(lane_swim_schedules)
+                # print(lane_swim_schedules)
                 all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
             else:
                 print(f"No schedule table found for {pool_name.replace('-', ' ').title()}.")
