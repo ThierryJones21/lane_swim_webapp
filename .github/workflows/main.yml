@@ -1,0 +1,27 @@
+name: refresh database
+
+on:
+  schedule:
+    - cron: "0 18 * * *"    #runs at 1:00pm-2pm depending on daylight savings ET everyday
+
+jobs:
+  getdataandrefreshmap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo content
+        uses: actions/checkout@v3 # checkout the repository content to github runner.
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9 #install the python needed
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: execute py script
+        run: |
+          python pool_scraper.py
+          git config user.name "github-actions"
+          git config user.email "action@users.noreply.github.com"
+          git add .
+          git commit -m "crongenerated database refresh"
+          git push
