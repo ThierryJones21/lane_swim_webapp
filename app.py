@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, String, Time, Integer
 from datetime import datetime, timedelta
+from sqlalchemy import desc
 
 Base = declarative_base()
 
