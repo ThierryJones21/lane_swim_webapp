@@ -2,30 +2,41 @@ name: refresh database
 
 on:
   schedule:
-    - cron: "0 21 * * *"    #runs at 1:00pm-2pm depending on daylight savings ET everyday
+    - cron: "0 22 * * *"    # Runs at 1:00pm-2pm depending on daylight savings ET everyday
 
 jobs:
   getdataandrefreshmap:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout repo content
-        uses: actions/checkout@v3 # checkout the repository content to github runner.
-      - name: setup python
+      - name: Checkout repo content
+        uses: actions/checkout@v3  # Checkout the repository content to GitHub runner.
+
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9 #install the python needed
+          python-version: 3.9  # Install the required Python version.
+
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: execute py script
+
+      - name: Rebase the current branch on top of the remote main
         run: |
-          python pool_scraper.py
+          git fetch origin  # Fetch the latest changes from the remote repository
+          git rebase origin/main  # Rebase the current branch onto the latest main branch
+
+      - name: Execute Python script
+        run: |
+          python pool_scraper.py  # This updates the lane_swim_webapp.db file with new data
+
+      - name: Commit and Push Changes
+        run: |
           git config user.name "github-actions"
           git config user.email "action@users.noreply.github.com"
 
-          
-          git add lane_swim_database.db
-          git commit -m "crongenerated database refresh"
-         
-          # Add, commit, and push changes
-          git diff-index --quiet HEAD || (git add . && git commit -m "cron-generated database refresh" && git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/ThierryJones21/lane_swim_webapp.git HEAD:main)
+          # Check if there are any changes in the .db file and other files
+          git diff-index --quiet HEAD || (
+            git add lane_swim_database.db  # Stage the database file
+            git commit -m "cron-generated database refresh"  # Commit changes with a message
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/ThierryJones21/lane_swim_webapp.git HEAD:main  # Push to the main branch
+          )
