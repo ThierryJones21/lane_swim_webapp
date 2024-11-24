@@ -2,6 +2,10 @@
     import { onMount } from 'svelte';
     import axios from 'axios';
     import MultiSelect from 'svelte-multiselect';
+    import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
+
+    const mapboxApiKey = process.env.VITE_PUBLIC_MAPBOX_API_KEY;
+    const { GeolocateControl, NavigationControl, ScaleControl } = controls
 
     let schedules = [];
     let poolFilter = [];
@@ -9,7 +13,10 @@
     let timeFilter = '';
     let isStartTimeSortedAsc = true;
     let pools = [];
+    let poolsDict = {};
     let scriptLog = {};
+    let mapComponent;
+    let brandColour = "rgb(255, 0, 0)";
 
     const fetchLastRunTime = async () => {
         try {
@@ -20,11 +27,28 @@
         }
     };
 
+    const geocodeAddress = async (address) => {
+        try {
+            console.log(address);
+            const geocodeResponse = await axios.get(`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(address)}.json&proximity=-75.695000,45.4201&access_token=${mapboxApiKey}`);
+            console.log(geocodeResponse.data.features);
+            const features = geocodeResponse.data.features;
+            if (features.length > 0) {
+                const [lng, lat] = features[0].geometry.coordinates;
+                return { lat, lng };
+            }
+        } catch (error) {
+            console.error('Error geocoding address:', error);
+        }
+        return null;
+    };
+
     // Fetching pools from the backend
     const fetchPools = async () => {
         try {
             const response = await axios.get('http://127.0.0.1:5000/pools');
             pools = response.data;
+            
         } catch (error) {
             console.error('Error fetching pools:', error);
         }
@@ -36,6 +60,10 @@
                 params: { 'pool[]': poolFilter, day: dayFilter, time: timeFilter }
             });
             schedules = response.data;
+            for (const schedule of schedules) {
+                const { lat, lng } = await geocodeAddress(schedule.address);
+                poolsDict[schedule.pool] = { "name" : schedule.pool, "lat": lat, "lng": lng  }; // Add lat/lng to the pool
+            }
         } catch (error) {
             console.error('Error fetching schedules:', error);
         }
@@ -54,7 +82,14 @@
         fetchPools(); // Fetch pools when the component mounts
         fetchSchedules(); // Fetch schedules initially
         fetchLastRunTime();
+        if (mapComponent){
+            mapComponent.setCenter([ '-75.695000','45.4201'], 4)
+        }
     });
+
+    function handleRecentre(e) {
+        console.log('Map recentered:', e.detail.center);
+    }
 </script>
 
 <h1>Ottawa Lane Swim Schedules</h1>
@@ -96,6 +131,33 @@
                 {/each}
             </select>
         </div>
+    </div>
+</div>
+
+<div style="display: flex; justify-content: center; align-items: center; height: 60vh;">
+    <div style="height: 60vh; width: 75%;">
+        <Map
+        accessToken={mapboxApiKey}
+        bind:this={mapComponent}
+        on:recentre={handleRecentre}
+        options={{ scrollZoom: true }}
+        >
+        <NavigationControl />
+        <GeolocateControl options={{ some: 'control-option' }}  />
+        <ScaleControl />
+        {#each Object.values(poolsDict) as pool}
+            {#if pool.lat && pool.lng}
+            <Marker
+                lat={pool.lat}
+                lng={pool.lng}
+                label={pool.name}
+                color={brandColour}
+            />
+            {console.log("Marker added for:", pool.name, pool.lat, pool.lng)}
+            {/if}
+        {/each}
+
+        </Map>
     </div>
 </div>
 
@@ -158,15 +220,12 @@
         flex-direction: column;
         align-items: center;
     }
-     /* Customize the MultiSelect component */
-     .svelte-multiselect {
-        display: block; /* Make sure multiselect is block */
-        width: 100%; /* Make it full width */
-    }
 
-    /* Custom styles for selected pools */
-    .selected-pools {
-        display: block; /* Each selected item in a block */
-        margin: 0.5rem 0; /* Add margin for spacing */
+    :global(.mapboxgl-marker){
+      cursor: pointer;
+    } 
+    :global(.mapboxgl-map) {
+        height: 100vh;  /* Make the map take full height */
+        width: 100%;    /* Make the map take full width */
     }
 </style>

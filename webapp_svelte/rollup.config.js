@@ -5,6 +5,13 @@ import terser from '@rollup/plugin-terser';
 import resolve from '@rollup/plugin-node-resolve';
 import livereload from 'rollup-plugin-livereload';
 import css from 'rollup-plugin-css-only';
+import replace from '@rollup/plugin-replace';
+
+
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -59,6 +66,12 @@ export default {
 			exportConditions: ['svelte']
 		}),
 		commonjs(),
+
+		replace({
+			'process.env.VITE_PUBLIC_MAPBOX_API_KEY': JSON.stringify(process.env.VITE_PUBLIC_MAPBOX_API_KEY),
+			// Include other environment variables as needed
+			preventAssignment: true
+		}),
 
 		// In dev mode, call `npm run start` once
 		// the bundle has been generated
