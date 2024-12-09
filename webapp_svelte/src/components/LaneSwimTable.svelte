@@ -4,6 +4,9 @@
     import MultiSelect from 'svelte-multiselect';
     import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
 
+    console.log("debug")
+    console.log(import.meta.env);
+
     const mapboxApiKey = import.meta.env.VITE_PUBLIC_MAPBOX_API_KEY;
     const { GeolocateControl, NavigationControl, ScaleControl } = controls
 
