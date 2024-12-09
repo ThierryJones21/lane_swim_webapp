@@ -7,6 +7,7 @@ from sqlalchemy import Column, String, Time, Integer
 from datetime import datetime, timedelta
 from sqlalchemy import desc
 
+
 Base = declarative_base()
 
 class LaneSwimSchedule(Base):
@@ -19,7 +20,7 @@ class LaneSwimSchedule(Base):
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    
+
 class ScriptLog(Base):
     __tablename__ = 'script_log'
     
@@ -71,23 +72,20 @@ def get_schedules():
         
     if 'day' in filters:
         query = query.filter(LaneSwimSchedule.day.ilike(f"%{filters['day']}%"))
-    if 'time' in filters:
-        time = filters['time'].split('-')
-        print(time)
-        if len(time) == 2:
-            start_time_str = time[0].strip() 
-            end_time_str = time[1].strip() 
-            try:
-                start_time = parse_time(start_time_str)
-                end_time = parse_time(end_time_str)
-                
-                # Update the query to check for overlapping times
-                query = query.filter(
-                    (LaneSwimSchedule.start_time >= start_time) & 
-                    (LaneSwimSchedule.end_time <= end_time)
-                )
-            except ValueError as e:
-                print(str(e))
+        
+    if 'start_time' in filters:
+        try:
+            start_time = parse_time(filters['start_time'])
+            query = query.filter(LaneSwimSchedule.start_time >= start_time)
+        except ValueError as e:
+            print(f"Invalid start time: {e}")
+
+    if 'end_time' in filters:
+        try:
+            end_time = parse_time(filters['end_time'])
+            query = query.filter(LaneSwimSchedule.end_time <= end_time)
+        except ValueError as e:
+            print(f"Invalid end time: {e}")
 
     schedules = query.all()
     session.close()
