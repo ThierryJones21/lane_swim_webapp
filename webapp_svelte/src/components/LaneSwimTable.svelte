@@ -11,7 +11,7 @@
     let poolFilter = [];
     let dayFilter = '';
     let startTimeFilter = '';
-    let endTimeFilter = '';
+    let endTimeFilter = '23:00';
     let isStartTimeSortedAsc = true;
     let pools = [];
     let poolsDict = {};
@@ -194,7 +194,12 @@
                 <th>Pool</th>
                 <th>Swim Type</th>
                 <th>Day</th>
-                <th>Start Time</th>
+                <th>
+                    Start Time 
+                    <button on:click={sortSchedulesByStartTime} aria-label="Sort by Start Time">
+                        {isStartTimeSortedAsc ? '▲' : '▼'}
+                    </button>
+                </th>
                 <th>End Time</th>
             </tr>
         </thead>
@@ -259,6 +264,9 @@
     .map-container {
         height: 60vh;
         transition: height 0.3s ease;
+        width: 75%;  
+        margin: 0 auto;
+        margin-bottom: 5vh;
     }
 
     .hidden-map {
