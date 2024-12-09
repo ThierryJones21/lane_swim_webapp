@@ -2,14 +2,44 @@
     import { onMount } from 'svelte';
     import axios from 'axios';
     import MultiSelect from 'svelte-multiselect';
+    import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
+
+    const mapboxApiKey = process.env.VITE_PUBLIC_MAPBOX_API_KEY;
+    const { GeolocateControl, NavigationControl, ScaleControl } = controls
 
     let schedules = [];
     let poolFilter = [];
     let dayFilter = '';
-    let timeFilter = '';
+    let startTimeFilter = '';
+    let endTimeFilter = '';
     let isStartTimeSortedAsc = true;
     let pools = [];
+    let poolsDict = {};
     let scriptLog = {};
+    let mapComponent;
+    let brandColour = "rgb(255, 0, 0)";
+
+    let isMapVisible = true;
+
+    function toggleMapVisibility() {
+        isMapVisible = !isMapVisible;
+    }
+
+    const geocodeAddress = async (address) => {
+        try {
+            console.log(address);
+            const geocodeResponse = await axios.get(`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(address)}.json&proximity=-75.695000,45.4201&access_token=${mapboxApiKey}`);
+            console.log(geocodeResponse.data.features);
+            const features = geocodeResponse.data.features;
+            if (features.length > 0) {
+                const [lng, lat] = features[0].geometry.coordinates;
+                return { lat, lng };
+            }
+        } catch (error) {
+            console.error('Error geocoding address:', error);
+        }
+        return null;
+    };
 
     // Fetching pools from the backend
 
@@ -18,7 +48,7 @@
             const response = await axios.get("https://lane-swim-webapp.onrender.com/script-log");
             scriptLog = response.data;
         } catch (error) {
-            console.error('Error fetching pools:', error);
+            console.error('Error fetching last run time:', error);
         }
     };
 
@@ -26,6 +56,7 @@
         try {
             const response = await axios.get("https://lane-swim-webapp.onrender.com/pools");
             pools = response.data;
+            
         } catch (error) {
             console.error('Error fetching pools:', error);
         }
@@ -34,9 +65,16 @@
     const fetchSchedules = async () => {
         try {
             const response = await axios.get("https://lane-swim-webapp.onrender.com/schedules", {
-                params: { 'pool[]': poolFilter, day: dayFilter, time: timeFilter }
+                params: { 'pool[]': poolFilter, day: dayFilter, start_time: startTimeFilter, end_time: endTimeFilter }
             });
             schedules = response.data;
+
+            // Clear and update poolsDict based on the filtered schedules
+            poolsDict = {};
+            for (const schedule of schedules) {
+                const { lat, lng } = await geocodeAddress(schedule.address);
+                poolsDict[schedule.pool] = { "name" : schedule.pool, "lat": lat, "lng": lng }; // Add lat/lng to the pool
+            }
         } catch (error) {
             console.error('Error fetching schedules:', error);
         }
@@ -55,7 +93,14 @@
         fetchPools(); // Fetch pools when the component mounts
         fetchSchedules(); // Fetch schedules initially
         fetchLastRunTime();
+        if (mapComponent){
+            mapComponent.setCenter([ '-75.695000','45.4201'], 4)
+        }
     });
+
+    function handleRecentre(e) {
+        console.log('Map recentered:', e.detail.center);
+    }
 </script>
 
 <h1>Ottawa Lane Swim Schedules</h1>
@@ -89,41 +134,84 @@
         </div>
 
         <div class="filter-item">
-            <label for="time-select"><strong>Filter by Time:</strong></label>
-            <select id="time-select" bind:value={timeFilter} on:change={fetchSchedules}>
-                <option value="">All Times</option>
-                {#each ["06:00-09:00", "09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00", "21:00-23:00"] as time}
+            <label for="start-time-select"><strong>Start Time:</strong></label>
+            <select id="start-time-select" bind:value={startTimeFilter} on:change={fetchSchedules}>
+                <option value="">Select Start Time</option>
+                {#each ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"] as time}
                     <option value={time}>{time}</option>
                 {/each}
             </select>
         </div>
+        
+        <div class="filter-item">
+            <label for="end-time-select"><strong>End Time:</strong></label>
+            <select id="end-time-select" bind:value={endTimeFilter} on:change={fetchSchedules}>
+                <option value="">Select End Time</option>
+                {#each ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"] as time}
+                    <option value={time}>{time}</option>
+                {/each}
+            </select>
+        </div>
+        
     </div>
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Pool</th>
-            <th>Swim Type</th>
-            <th>Day</th>
-            <th on:click={sortSchedulesByStartTime} style="cursor: pointer;">
-                Start Time {isStartTimeSortedAsc ? '▲' : '▼'}
-            </th>
-            <th>End Time</th>
-        </tr>
-    </thead>
-    <tbody>
-        {#each schedules as schedule}
-            <tr>
-                <td><a href="https://www.google.com/maps/search/?api=1&query={schedule.address}" target="_blank">{schedule.pool}</a></td>
-                <td>{schedule.swim_type}</td>
-                <td>{schedule.day}</td>
-                <td>{schedule.start_time}</td>
-                <td>{schedule.end_time}</td>
-            </tr>
+<div>
+    <!-- Toggle Button -->
+    <button class="toggle-map-button" on:click={toggleMapVisibility}>
+        {#if isMapVisible}
+            ▲ Hide Map
+        {:else}
+            ▼ Show Map
+        {/if}
+    </button>
+</div>
+
+<div class="map-container {isMapVisible ? '' : 'hidden-map'}">
+    <Map
+        accessToken={mapboxApiKey}
+        bind:this={mapComponent}
+        on:recentre={handleRecentre}
+        options={{ scrollZoom: true }}
+    >
+        <NavigationControl />
+        <GeolocateControl options={{ some: 'control-option' }} />
+        <ScaleControl />
+        
+        {#each Object.values(poolsDict) as pool}
+            {#if pool.lat && pool.lng}
+                <Marker lat={pool.lat} lng={pool.lng} label={pool.name} color={brandColour} />
+            {/if}
         {/each}
-    </tbody>
-</table>
+    </Map>
+</div>
+
+<!-- Schedule Table -->
+<div class="schedule-table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Pool</th>
+                <th>Swim Type</th>
+                <th>Day</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {#each schedules as schedule}
+                <tr>
+                    <td><a href="https://www.google.com/maps/search/?api=1&query={schedule.address}" target="_blank">{schedule.pool}</a></td>
+                    <td>{schedule.swim_type}</td>
+                    <td>{schedule.day}</td>
+                    <td>{schedule.start_time}</td>
+                    <td>{schedule.end_time}</td>
+                </tr>
+            {/each}
+        </tbody>
+    </table>
+</div>
+
 
 <style>
     /* Basic styling */
@@ -159,15 +247,26 @@
         flex-direction: column;
         align-items: center;
     }
-     /* Customize the MultiSelect component */
-     .svelte-multiselect {
-        display: block; /* Make sure multiselect is block */
-        width: 100%; /* Make it full width */
+
+    :global(.mapboxgl-marker){
+      cursor: pointer;
+    } 
+    :global(.mapboxgl-map) {
+        height: 100vh;  /* Make the map take full height */
+        width: 100%;    /* Make the map take full width */
     }
 
-    /* Custom styles for selected pools */
-    .selected-pools {
-        display: block; /* Each selected item in a block */
-        margin: 0.5rem 0; /* Add margin for spacing */
+    .map-container {
+        height: 60vh;
+        transition: height 0.3s ease;
+    }
+
+    .hidden-map {
+        height: 0;
+        overflow: hidden;
+    }
+
+    .schedule-table-container {
+        transition: opacity 0.3s ease;
     }
 </style>
