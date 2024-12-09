@@ -10,13 +10,20 @@
     let schedules = [];
     let poolFilter = [];
     let dayFilter = '';
-    let timeFilter = '';
+    let startTimeFilter = '';
+    let endTimeFilter = '';
     let isStartTimeSortedAsc = true;
     let pools = [];
     let poolsDict = {};
     let scriptLog = {};
     let mapComponent;
     let brandColour = "rgb(255, 0, 0)";
+
+    let isMapVisible = true;
+
+    function toggleMapVisibility() {
+        isMapVisible = !isMapVisible;
+    }
 
     const fetchLastRunTime = async () => {
         try {
@@ -57,12 +64,15 @@
     const fetchSchedules = async () => {
         try {
             const response = await axios.get('http://127.0.0.1:5000/schedules', {
-                params: { 'pool[]': poolFilter, day: dayFilter, time: timeFilter }
+                params: { 'pool[]': poolFilter, day: dayFilter, start_time: startTimeFilter, end_time: endTimeFilter }
             });
             schedules = response.data;
+
+            // Clear and update poolsDict based on the filtered schedules
+            poolsDict = {};
             for (const schedule of schedules) {
                 const { lat, lng } = await geocodeAddress(schedule.address);
-                poolsDict[schedule.pool] = { "name" : schedule.pool, "lat": lat, "lng": lng  }; // Add lat/lng to the pool
+                poolsDict[schedule.pool] = { "name" : schedule.pool, "lat": lat, "lng": lng }; // Add lat/lng to the pool
             }
         } catch (error) {
             console.error('Error fetching schedules:', error);
@@ -123,68 +133,84 @@
         </div>
 
         <div class="filter-item">
-            <label for="time-select"><strong>Filter by Time:</strong></label>
-            <select id="time-select" bind:value={timeFilter} on:change={fetchSchedules}>
-                <option value="">All Times</option>
-                {#each ["06:00-09:00", "09:00-12:00", "12:00-15:00", "15:00-18:00", "18:00-21:00", "21:00-23:00"] as time}
+            <label for="start-time-select"><strong>Start Time:</strong></label>
+            <select id="start-time-select" bind:value={startTimeFilter} on:change={fetchSchedules}>
+                <option value="">Select Start Time</option>
+                {#each ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"] as time}
                     <option value={time}>{time}</option>
                 {/each}
             </select>
         </div>
+        
+        <div class="filter-item">
+            <label for="end-time-select"><strong>End Time:</strong></label>
+            <select id="end-time-select" bind:value={endTimeFilter} on:change={fetchSchedules}>
+                <option value="">Select End Time</option>
+                {#each ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"] as time}
+                    <option value={time}>{time}</option>
+                {/each}
+            </select>
+        </div>
+        
     </div>
 </div>
 
-<div style="display: flex; justify-content: center; align-items: center; height: 60vh;">
-    <div style="height: 60vh; width: 75%;">
-        <Map
+<div>
+    <!-- Toggle Button -->
+    <button class="toggle-map-button" on:click={toggleMapVisibility}>
+        {#if isMapVisible}
+            ▲ Hide Map
+        {:else}
+            ▼ Show Map
+        {/if}
+    </button>
+</div>
+
+<div class="map-container {isMapVisible ? '' : 'hidden-map'}">
+    <Map
         accessToken={mapboxApiKey}
         bind:this={mapComponent}
         on:recentre={handleRecentre}
         options={{ scrollZoom: true }}
-        >
+    >
         <NavigationControl />
-        <GeolocateControl options={{ some: 'control-option' }}  />
+        <GeolocateControl options={{ some: 'control-option' }} />
         <ScaleControl />
+        
         {#each Object.values(poolsDict) as pool}
             {#if pool.lat && pool.lng}
-            <Marker
-                lat={pool.lat}
-                lng={pool.lng}
-                label={pool.name}
-                color={brandColour}
-            />
-            {console.log("Marker added for:", pool.name, pool.lat, pool.lng)}
+                <Marker lat={pool.lat} lng={pool.lng} label={pool.name} color={brandColour} />
             {/if}
         {/each}
-
-        </Map>
-    </div>
+    </Map>
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Pool</th>
-            <th>Swim Type</th>
-            <th>Day</th>
-            <th on:click={sortSchedulesByStartTime} style="cursor: pointer;">
-                Start Time {isStartTimeSortedAsc ? '▲' : '▼'}
-            </th>
-            <th>End Time</th>
-        </tr>
-    </thead>
-    <tbody>
-        {#each schedules as schedule}
+<!-- Schedule Table -->
+<div class="schedule-table-container">
+    <table>
+        <thead>
             <tr>
-                <td><a href="https://www.google.com/maps/search/?api=1&query={schedule.address}" target="_blank">{schedule.pool}</a></td>
-                <td>{schedule.swim_type}</td>
-                <td>{schedule.day}</td>
-                <td>{schedule.start_time}</td>
-                <td>{schedule.end_time}</td>
+                <th>Pool</th>
+                <th>Swim Type</th>
+                <th>Day</th>
+                <th>Start Time</th>
+                <th>End Time</th>
             </tr>
-        {/each}
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            {#each schedules as schedule}
+                <tr>
+                    <td><a href="https://www.google.com/maps/search/?api=1&query={schedule.address}" target="_blank">{schedule.pool}</a></td>
+                    <td>{schedule.swim_type}</td>
+                    <td>{schedule.day}</td>
+                    <td>{schedule.start_time}</td>
+                    <td>{schedule.end_time}</td>
+                </tr>
+            {/each}
+        </tbody>
+    </table>
+</div>
+
 
 <style>
     /* Basic styling */
@@ -227,5 +253,19 @@
     :global(.mapboxgl-map) {
         height: 100vh;  /* Make the map take full height */
         width: 100%;    /* Make the map take full width */
+    }
+
+    .map-container {
+        height: 60vh;
+        transition: height 0.3s ease;
+    }
+
+    .hidden-map {
+        height: 0;
+        overflow: hidden;
+    }
+
+    .schedule-table-container {
+        transition: opacity 0.3s ease;
     }
 </style>
