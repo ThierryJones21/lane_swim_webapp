@@ -1,8 +1,10 @@
 name: refresh database
 
-on:
-  schedule:
-    - cron: "0 22 * * *"    # Runs at 1:00pm-2pm depending on daylight savings ET everyday
+on: workflow_dispatch
+
+# on:
+#   schedule:
+#     - cron: "0 22 * * *"    # Runs at 1:00pm-2pm depending on daylight savings ET everyday
 
 jobs:
   getdataandrefreshmap:
