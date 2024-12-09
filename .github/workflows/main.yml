@@ -5,35 +5,39 @@ on: workflow_dispatch
 # on:
 #   schedule:
 #     - cron: "0 22 * * *"    # Runs at 1:00pm-2pm depending on daylight savings ET everyday
-
 jobs:
   getdataandrefreshmap:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo content
-        uses: actions/checkout@v3  # Checkout the repository content to GitHub runner.
+        uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9  # Install the required Python version.
+          python-version: 3.9
 
       - name: Install dependencies and Execute Python script
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          python pool_scraper.py  # This updates the lane_swim_webapp.db file with new data
+          python pool_scraper.py
 
-      - name: switching from HTTPS to SSH
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Switching from HTTPS to SSH
         run: |
-          git remote set-url origin ${{ secrets.ssh }}
-          
+          git remote set-url origin "${{ secrets.ssh }}"
+
       - name: Check for changes
-        run: |
-          git status
-        
+        run: git status
+
       - name: Commit and Push Changes
         run: |
-          git add . # Stage the database file
-          git commit -m "cron-generated database refresh"  # Commit changes with a message
-          git push origin HEAD:prod  # Push to the main branch
+          git add .
+          git commit -m "cron-generated database refresh"
+          git push origin HEAD:prod
+
         
