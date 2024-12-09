@@ -4,10 +4,7 @@
     import MultiSelect from 'svelte-multiselect';
     import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
 
-    console.log("debug")
-    console.log(import.meta.env);
-
-    const mapboxApiKey = import.meta.env.VITE_PUBLIC_MAPBOX_API_KEY;
+    const mapboxApiKey = "pk.eyJ1IjoidGhpZXJyeWpvbmVzMjEiLCJhIjoiY20zdnlxZG03MHpzaDJqb2JiMnR4dWt6ZSJ9.cr_IvZqYAE9PujyFomE-GA";
     const { GeolocateControl, NavigationControl, ScaleControl } = controls
 
     let schedules = [];
