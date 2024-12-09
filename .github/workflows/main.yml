@@ -16,27 +16,22 @@ jobs:
         with:
           python-version: 3.9  # Install the required Python version.
 
-      - name: Install dependencies
+      - name: Install dependencies and Execute Python script
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Rebase the current branch on top of the remote main
-        run: |
-          git fetch origin  # Fetch the latest changes from the remote repository
-          git rebase origin/main  # Rebase the current branch onto the latest main branch
-
-      - name: Execute Python script
-        run: |
           python pool_scraper.py  # This updates the lane_swim_webapp.db file with new data
 
+      - name: switching from HTTPS to SSH
+        run: |
+          git remote set-url origin ${{ secrets.ssh }}
+          
+      - name: Check for changes
+        run: |
+          git status
+        
       - name: Commit and Push Changes
         run: |
-          git config user.name "github-actions"
-          git config user.email "action@users.noreply.github.com"
-
-          # Check if there are any changes in the .db file and other files
-          git diff-index --quiet HEAD || (
-            git add lane_swim_database.db  # Stage the database file
-            git commit -m "cron-generated database refresh"  # Commit changes with a message
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/ThierryJones21/lane_swim_webapp.git HEAD:main  # Push to the main branch
-          )
+          git add . # Stage the database file
+          git commit -m "cron-generated database refresh"  # Commit changes with a message
+          git push origin HEAD:prod  # Push to the main branch
+        
