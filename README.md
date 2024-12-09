@@ -1,74 +1,26 @@
 # Ottawa Lane Swim Scheduler
 
-This project provides a lane swim schedule dashboard web application with a Flask backend and a Svelte frontend.
+This project provides a comprehensive lane swim schedule dashboard for swimmers in Ottawa. It combines a **Flask backend** and a **Svelte frontend** to deliver a seamless user experience.
 
-## Table of Contents
-1. [Getting Started](#getting-started)
-2. [Backend Setup (Flask)](#backend-setup-flask)
-3. [Frontend Setup (Svelte)](#frontend-setup-svelte)
-4. [Running the Application](#running-the-application)
+## Features
 
-## Getting Started
+- Filter swim schedules by pool, day, start time, and end time.
+- View pool locations on an interactive Mapbox map.
+- Sort schedules dynamically by start time.
+- Integration with Mapbox for geolocation and mapping.
+- Real-time updates with a script that fetches the latest schedules.
 
-### Prerequisites
+## Live Deployment
 
-- **Python** (3.7 or later) - [Download here](https://www.python.org/downloads/)
-- **Node.js** (16 or later) and npm - [Download here](https://nodejs.org/)
+The application is live and accessible here:  
+[Ottawa Lane Swim Scheduler](https://lane-swim-webapp.vercel.app/)
 
-Ensure both `python` and `node` are in your system path.
----
+## Project Structure
 
-**Clone the Repository** (if you haven't already):
-   ```bash
-   git clone https://github.com/thierryjones21/lane-swim-scheduler.git
-   ```
-   ```bash
-   cd lane-swim-scheduler
-   ```
+1. **Backend (Flask):**  
+   The Flask backend handles API requests, fetching pool schedules, and geocoding addresses for mapping.
 
-## Backend Setup (Flask)
-
-**Install Dependencies and Run the WebScraper to get the database (.db) file**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   ```bash
-   python pool_scraper.py
-   ```
-
-**Run Flask Server**
-   ```bash
-   python flask_app.py
-   ```
-
-## Frontend Setup (Svelte)
-
-**Install Dependencies and Run Svelte Server**
-Open a new terminal, then navigate to webapp folder. Install the node modules required to run the svelte app.
-   ```bash
-   cd /webapp_svelte
-   ```
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-## Running the Application
-
-Once both the Flask backend and Svelte frontend are running, you can access the application by navigating to [http://localhost:5173](http://localhost:5173) in your browser.
-
-- **To stop the Flask server:** Press `Ctrl+C` in the terminal where it's running.
-- **To stop the Svelte server:** Press `Ctrl+C` in the terminal where it's running.
-
-## API Endpoints
-
-| Endpoint     | Method | Description                |
-|--------------|--------|----------------------------|
-| `/schedules` | GET    | Get a list of all schedules |
-| `/pools`     | GET    | Get a list of available pools |
-
-## Additional Notes
-
-- **Database Reset:** If you need to reset the database, delete `lane_swim_database.db` in the backend directory and rerun the commands in the **Backend Setup** section.
-
-
+2. **Frontend (Svelte):**  
+   The Svelte frontend provides an interactive user interface, including:
+   - Schedule table with sorting and filtering.
+   - Map with pool markers and details.
