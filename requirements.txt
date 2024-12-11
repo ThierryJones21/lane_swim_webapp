@@ -4,4 +4,5 @@ pandas
 SQLAlchemy==2.0.36
 Flask
 flask-cors
+gunicorn
 fuzzywuzzy

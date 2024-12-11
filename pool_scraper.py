@@ -27,12 +27,14 @@ class LaneSwimSchedule(Base):
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
 
+# Define a new model to log script execution
 class ScriptLog(Base):
     __tablename__ = 'script_log'
     
     id = Column(Integer, primary_key=True)
     script_name = Column(String, nullable=False)
     last_run_time = Column(String, nullable=False)
+
     
 def get_pools():
     pool_data = {}
@@ -311,7 +313,7 @@ def main():
             session.add(swim_schedule)
         session.commit()
         
-         # Log the script execution time
+        # Log the script execution time
         script_log = ScriptLog(
             script_name="Ottawa Activities Scraper",
             last_run_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")

@@ -20,10 +20,10 @@ Ensure both `python` and `node` are in your system path.
 
 **Clone the Repository** (if you haven't already):
    ```bash
-   git clone https://github.com/thierryjones21/lane-swim-scheduler.git
+   git clone https://github.com/thierryjones21/lane-swim-webapp.git
    ```
    ```bash
-   cd lane-swim-scheduler
+   cd lane_swim_webapp
    ```
 
 ## Backend Setup (Flask)

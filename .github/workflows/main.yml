@@ -1,0 +1,46 @@
+name: refresh database
+
+# for testing
+# on: workflow_dispatch
+
+on:
+  schedule:
+    - cron: "30 14 * * *"    # Runs at 10:30am depending on daylight savings ET everyday
+jobs:
+  getdataandrefreshmap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo content
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies and Execute Python script
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python pool_scraper.py
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Switching from HTTPS to SSH
+        run: |
+          git remote set-url origin "${{ secrets.ssh }}"
+
+      - name: Check for changes
+        run: git status
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "thierryjones"
+          git config user.email "jones.thierry@gmail.com"
+          git add .
+          git commit -m "cron-generated database refresh"
+          git push origin HEAD:prod
+
+        
