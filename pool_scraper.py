@@ -9,7 +9,7 @@ import re
 from fuzzywuzzy import fuzz
 
 
-pool_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?place_facets%5B0%5D=place_type%3A4285"
+facility_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?page="
 url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/"
 
 # Define the base class for SQLAlchemy
@@ -36,37 +36,41 @@ class ScriptLog(Base):
     
 def get_pools():
     pool_data = {}
-    response = requests.get(pool_name_url)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Find the table within the div with class "table-responsive"
-        table_div = soup.find("div", class_="table-responsive")
-        table = table_div.find("table") if table_div else None
-        
-        if table:
-            for row in table.find_all('tr'):
-                if row.find('td'):
-                    # Find the pool name link and address container
-                    name_tag = row.find('td', class_='views-field views-field-title').find('a')
-                    address_tag = row.find('td', class_='views-field views-field-field-address').find('p', class_='address')
+    for i in range(0,5):
+        page_url = facility_name_url + str(i)
+        print(page_url)
+        response = requests.get(page_url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Find the table within the div with class "table-responsive"
+            table_div = soup.find("div", class_="table-responsive")
+            table = table_div.find("table") if table_div else None
+            
+            if table:
+                for row in table.find_all('tr'):
+                    if row.find('td'):
+                        # Find the pool name link and address container
+                        name_tag = row.find('td', class_='views-field views-field-title').find('a')
+                        address_tag = row.find('td', class_='views-field views-field-field-address').find('p', class_='address')
 
-                    if name_tag and address_tag:
-                        # Get pool name
-                        pool_url = name_tag['href']
-                        pool_name = pool_url.split('/')[-1]
-                        
-                        # Get address details
-                        address_line = address_tag.find('span', class_='address-line1').get_text(strip=True)
-                        locality = address_tag.find('span', class_='locality').get_text(strip=True)
-                        admin_area = address_tag.find('span', class_='administrative-area').get_text(strip=True)
-                        postal_code = address_tag.find('span', class_='postal-code').get_text(strip=True)
-                        
-                        # Combine address components into a single string
-                        full_address = f"{address_line}, {locality}, {admin_area} {postal_code}, Canada"
-                        
-                        # Add to dictionary
-                        pool_data[pool_name] = full_address
+                        if name_tag and address_tag:
+                            # Get pool name
+                            pool_url = name_tag['href']
+                            pool_name = pool_url.split('/')[-1]
+                            
+                            # Get address details
+                            address_line = address_tag.find('span', class_='address-line1').get_text(strip=True)
+                            locality = address_tag.find('span', class_='locality').get_text(strip=True)
+                            admin_area = address_tag.find('span', class_='administrative-area').get_text(strip=True)
+                            postal_code = address_tag.find('span', class_='postal-code').get_text(strip=True)
+                            
+                            # Combine address components into a single string
+                            full_address = f"{address_line}, {locality}, {admin_area} {postal_code}, Canada"
+                            
+                            # Add to dictionary
+                            pool_data[pool_name] = full_address
+    print(pool_data)
     return pool_data
 
 def parse_schedule_time(schedule_time):

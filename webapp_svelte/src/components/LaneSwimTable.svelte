@@ -5,6 +5,7 @@
     import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
 
     const mapboxApiKey = process.env.VITE_PUBLIC_MAPBOX_API_KEY;
+    const api_end_point = "http://127.0.0.1:5000";
     const { GeolocateControl, NavigationControl, ScaleControl } = controls;
 
     let schedules = [];
@@ -31,7 +32,7 @@
 
     const fetchLastRunTime = async () => {
         try {
-            const response = await axios.get("http://127.0.0.1:5000/script-log");
+            const response = await axios.get(`${api_end_point}/script-log`);
             scriptLog = response.data;
         } catch (error) {
             console.error('Error fetching pools:', error);
@@ -55,7 +56,7 @@
     // Fetch pools from backend
     const fetchPools = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/pools');
+            const response = await axios.get(`${api_end_point}/pools`);
             pools = response.data;
         } catch (error) {
             console.error('Error fetching pools:', error);
@@ -65,7 +66,7 @@
     // Fetch swim types from backend
     const fetchSwimTypes = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/swim-types'); // Assuming an endpoint for swim types
+            const response = await axios.get(`${api_end_point}/swim-types`); // Assuming an endpoint for swim types
             swimTypes = response.data; // Store swim types dynamically
         } catch (error) {
             console.error('Error fetching swim types:', error);
@@ -74,7 +75,7 @@
 
     const fetchSchedules = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/schedules', {
+            const response = await axios.get(`${api_end_point}/schedules`, {
                 params: { 
                     'pool[]': poolFilter,
                     day: dayFilter,
