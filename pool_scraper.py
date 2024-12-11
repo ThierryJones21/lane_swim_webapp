@@ -5,6 +5,9 @@ from datetime import datetime
 from sqlalchemy import create_engine, Column, String, Time, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import re
+from fuzzywuzzy import fuzz
+
 
 pool_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?place_facets%5B0%5D=place_type%3A4285"
 url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/"
@@ -77,7 +80,7 @@ def parse_schedule_time(schedule_time):
     # Define possible formats
     formats = ["%I:%M %p", "%I %p", "%I:%M", "%I", "%I%p"]
     for time_range in times:
-        print(f"\n timerange {time_range}")
+        # print(f"\n timerange {time_range}")
         # Split the time range by the dash for start and end times
         start_end = time_range.strip().split('-')
         # Ensure there are exactly two elements: start and end
@@ -118,41 +121,131 @@ def parse_schedule_time(schedule_time):
             time_ranges.append((start_time, end_time))
     return time_ranges
 
-def extract_lane_swim_rows(table, pool_name, address):
+def parse_date(date_str, default_year):
+    """
+    Parse the date string and return a datetime object.
+    If only month and day are provided, use the default_year.
+    """
+    try:
+        return datetime.strptime(f"{date_str}, {default_year}", "%B %d, %Y")
+    except ValueError:
+        return None
+
+def validate_table_date_range(table):
+    """
+    Validate table data with caption date range when comparing it to today's date.
+    """
+    today = datetime.now()
+    
+    # Updated regex to handle both full dates and day ranges
+    date_pattern = r"([a-z]+ \d{1,2})(?:, \d{4})?\s*to\s*([a-z]+ \d{1,2})(?:, \d{4})?"
+
+    caption = table.find("caption")
+    if caption:
+        caption = caption.text.encode("utf-8", "ignore").decode("utf-8")
+        caption = caption.replace("\u202f", " ").replace("\xa0", " ").lower()
+        # print(f"Caption: {caption}")
+        
+        matches = re.findall(date_pattern, caption)
+        
+        if matches:
+            for match in matches:
+                # print(f"Found match: {match}")
+                try:
+                    start_date_str, end_date_str = match
+                    
+                    # Use the current year if no year is provided
+                    if ',' in start_date_str:
+                        start_date = parse_date(start_date_str, today.year)
+                    else:
+                        start_date = parse_date(start_date_str, today.year)
+                    
+                    if ',' in end_date_str:
+                        end_date = parse_date(end_date_str, today.year)
+                    else:
+                        end_date = parse_date(end_date_str, today.year)
+
+                    # Adjust if end date is earlier than start date (e.g., for New Year's crossing)
+                    if start_date > end_date:
+                        end_date = end_date.replace(year=start_date.year + 1)
+                    
+                    # Check if today's date is within the range
+                    if start_date <= today <= end_date:
+                        print(f"Today's date {today} is within the range.")
+                        return True
+                    else:
+                        print(f"Today's date {today} is NOT within the range.")
+                
+                except ValueError as e:
+                    print(f"Error parsing dates: {e}")
+    return False
+    
+
+def extract_lane_swim_rows(table, pool_name, address, existing_types):
     lane_swim_schedules = []
-    # Iterate through each row in the table body
-    for row in table.find_all("tr"):
-        header = row.find("th")  # Get the header cell 
-        if header:
-            # If &nbsp; or any other unrecognized characters \u202f in cell to write new line in html clean out
-            header = header.text.encode("utf-8", "ignore").decode("utf-8")
-            header = header.replace("\u202f", " ").replace("\xa0", " ") 
-            if "lane swim" in header.lower():  # Check if "Lane swim" is in the header text any type convert to lower 
-                swim_type = header.strip().replace("\n", " ").replace("\t", " ").replace('–', '-')  
+    
+    if validate_table_date_range(table):
+        # Iterate through each row in the table body 
+        # debug statement to print only tables that have valid date ranges   
+        # print(table.find("caption"))
+        for row in table.find_all("tr"):
+            header = row.find("th")  # Get the header cell 
+            if header:
+                # If &nbsp; or any other unrecognized characters \u202f in cell to write new line in html clean out
+                header = header.text.encode("utf-8", "ignore").decode("utf-8")
+                header = header.replace("\u202f", " ").replace("\xa0", " ") 
+                # if "lane swim" in header.lower():  # Check if "Lane swim" is in the header text any type convert to lower 
+                print(f"Activity Type: {header.lower()}")
+                type_of_activity = header.strip().replace("\n", " ").replace("\t", " ").replace('–', '-')
+                
+                # Compare with existing types to see if it's similar
+                matched_type = None
+                for existing_type in existing_types:
+                    # Use fuzzy matching to check similarity (you can adjust the threshold)
+                    if fuzz.partial_ratio(type_of_activity.lower(), existing_type.lower()) > 90:  # 80% similarity
+                        matched_type = existing_type
+                        break
+                
+                if matched_type:
+                    type_of_activity = matched_type 
+                    
                 cells = row.find_all("td")  # Get all the data cells in the row
-                days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']                
+                days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']      
+                # print(header.lower())          
                 for day, cell in zip(days, cells):
                     schedule_time = cell.text.encode("utf-8", "ignore").decode("utf-8")
                     schedule_time = schedule_time.replace("\u202f", " ").replace("\xa0", " ") 
                     if schedule_time and schedule_time.lower() != 'n/a':  # Only consider valid times
                         start_end_times = parse_schedule_time(schedule_time)
+                        # debug 
+                        # print(start_end_times)
                         for start_end in start_end_times:
-                            print(start_end)
+                            # print(start_end)
                             lane_swim_schedules.append({
                                 'Pool': pool_name,
                                 'Address': address, 
-                                'Swim Type': swim_type,
+                                'Swim Type': type_of_activity,
                                 'Day': day,
                                 'Start Time': start_end[0],  # Start time from tuple
                                 'End Time': start_end[1]     # End time from tuple
                             })
-                else:
-                    print("header laneswim not found")
+                if type_of_activity not in existing_types:
+                    existing_types.append(type_of_activity)
+            else:
+                print("Header not found in row header")
+    else:
+        print(f"table data range invalid: {table.find('caption')}")
+                        
     return lane_swim_schedules
+
+import requests
+from bs4 import BeautifulSoup
 
 def main():
     # List to hold all schedules
     all_lane_swim_schedules = []
+    
+    existing_types = [] 
     
     # Dynamically web scrape pool names and url links to each one
     pool_names = get_pools()
@@ -165,20 +258,24 @@ def main():
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Find the table within the div with class "table-responsive"
-            table_div = soup.find("div", class_="table-responsive")
-            table = table_div.find("table") if table_div else None
-            if table:
-                lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address)
-                # print(lane_swim_schedules)
-                all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
+            # Find all tables within the page (not just the first one inside "table-responsive")
+            tables = soup.find_all("table")
+            
+            if tables:
+                for table in tables:
+                    # If the table is part of the desired schedule, process it
+                    lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, existing_types)
+                    all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
             else:
-                print(f"No schedule table found for {pool_name.replace('-', ' ').title()}.")
+                print(f"No schedule tables found for {pool_name.replace('-', ' ').title()}.")
         else:
             print(f"Failed to retrieve data for {pool_name.replace('-', ' ').title()}. Status code: {response.status_code}")
     
+    # Optionally, print or process all collected schedules
+    print(f"Total schedules collected: {len(all_lane_swim_schedules)}")
+
     # If any table are found
-    if lane_swim_schedules:
+    if all_lane_swim_schedules:
         df = pd.DataFrame(all_lane_swim_schedules)
         df['Start Time'] = pd.to_datetime(df['Start Time'], format='%I:%M %p', errors='coerce').dt.time
         df['End Time'] = pd.to_datetime(df['End Time'], format='%I:%M %p', errors='coerce').dt.time
@@ -214,7 +311,7 @@ def main():
         
         # Log the script execution time
         script_log = ScriptLog(
-            script_name="Lane Swim Scraper",
+            script_name="Ottawa Activities Scraper",
             last_run_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
         session.add(script_log)

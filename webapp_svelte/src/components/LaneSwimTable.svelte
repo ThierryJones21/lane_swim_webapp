@@ -12,7 +12,11 @@
     let dayFilter = '';
     let startTimeFilter = '';
     let endTimeFilter = '23:00';
+    let swimTypeFilter = []; // New swim type filter
+    let swimTypes = []; // Store swim types
     let isStartTimeSortedAsc = true;
+    let isPoolSortedAsc = true;
+    let isSwimTypeSortedAsc =true;
     let pools = [];
     let poolsDict = {};
     let scriptLog = {};
@@ -27,9 +31,7 @@
 
     const geocodeAddress = async (address) => {
         try {
-            console.log(address);
             const geocodeResponse = await axios.get(`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(address)}.json&proximity=-75.695000,45.4201&access_token=${mapboxApiKey}`);
-            console.log(geocodeResponse.data.features);
             const features = geocodeResponse.data.features;
             if (features.length > 0) {
                 const [lng, lat] = features[0].geometry.coordinates;
@@ -41,7 +43,7 @@
         return null;
     };
 
-    // Fetching pools from the backend
+    
 
     const fetchLastRunTime = async () => {
         try {
@@ -52,28 +54,43 @@
         }
     };
 
+    // Fetching pools from the backend
     const fetchPools = async () => {
         try {
             const response = await axios.get("https://lane-swim-webapp.onrender.com/pools");
             pools = response.data;
-            
         } catch (error) {
             console.error('Error fetching pools:', error);
         }
     };
 
+    // Fetch swim types from backend
+    const fetchSwimTypes = async () => {
+        try {
+            const response = await axios.get('http://127.0.0.1:5000/swim-types'); // Assuming an endpoint for swim types
+            swimTypes = response.data; // Store swim types dynamically
+        } catch (error) {
+            console.error('Error fetching swim types:', error);
+        }
+    };
+
     const fetchSchedules = async () => {
         try {
-            const response = await axios.get("https://lane-swim-webapp.onrender.com/schedules", {
-                params: { 'pool[]': poolFilter, day: dayFilter, start_time: startTimeFilter, end_time: endTimeFilter }
+            const response = await axios.get('http://127.0.0.1:5000/schedules', {
+                params: { 
+                    'pool[]': poolFilter,
+                    day: dayFilter,
+                    start_time: startTimeFilter,
+                    end_time: endTimeFilter,
+                    'swim_type[]': swimTypeFilter // Adding swim type filter
+                }
             });
             schedules = response.data;
 
-            // Clear and update poolsDict based on the filtered schedules
             poolsDict = {};
             for (const schedule of schedules) {
                 const { lat, lng } = await geocodeAddress(schedule.address);
-                poolsDict[schedule.pool] = { "name" : schedule.pool, "lat": lat, "lng": lng }; // Add lat/lng to the pool
+                poolsDict[schedule.pool] = { "name": schedule.pool, "lat": lat, "lng": lng };
             }
         } catch (error) {
             console.error('Error fetching schedules:', error);
@@ -89,12 +106,22 @@
         isStartTimeSortedAsc = !isStartTimeSortedAsc;
     };
 
+    const sortSchedulesByProperty = (property, isAsc) => {
+        schedules = schedules.slice().sort((a, b) => {
+            const valueA = a[property].toLowerCase();
+            const valueB = b[property].toLowerCase();
+            return isAsc ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+        });
+    };
+
+
     onMount(() => {
         fetchPools(); // Fetch pools when the component mounts
+        fetchSwimTypes(); // Fetch swim types when the component mounts
         fetchSchedules(); // Fetch schedules initially
         fetchLastRunTime();
-        if (mapComponent){
-            mapComponent.setCenter([ '-75.695000','45.4201'], 4)
+        if (mapComponent) {
+            mapComponent.setCenter([ '-75.695000', '45.4201'], 4);
         }
     });
 
@@ -103,7 +130,7 @@
     }
 </script>
 
-<h1>Ottawa Lane Swim Schedules</h1>
+<h1>Ottawa Activity Schedules</h1>
 
 <div class="script-log">
     <p><strong>Last Updated:</strong> {scriptLog.last_run_time ? `${scriptLog.last_run_time} (Script: ${scriptLog.script_name})` : "Fetching..."}</p>
@@ -112,15 +139,27 @@
 <div class="filters">
     <div class="filter-container">
         <div class="filter-item">
-            <label for="pool-select"><strong>Filter by Pool:</strong></label>
+            <label for="pool-select"><strong>Filter by Facility:</strong></label>
             <MultiSelect
                 id="pool-select"
                 options={pools}
-                placeholder="Select pools"
+                placeholder="Select facility"
                 bind:selected={poolFilter}
                 on:change={fetchSchedules}
                 allowUserOptions="append"
                 ulSelectedClass="selected-pools"  />
+        </div>
+
+        <div class="filter-item">
+            <label for="swim-type-select"><strong>Filter by Type:</strong></label>
+            <MultiSelect
+                id="swim-type-select"
+                options={swimTypes}  
+                placeholder="Select activity type"
+                bind:selected={swimTypeFilter}
+                on:change={fetchSchedules}
+                allowUserOptions="append"
+                ulSelectedClass="selected-activity-types" />
         </div>
 
         <div class="filter-item">
@@ -191,8 +230,28 @@
     <table>
         <thead>
             <tr>
-                <th>Pool</th>
-                <th>Swim Type</th>
+                <th>
+                    Pool
+                    <button 
+                        on:click={() => {
+                            sortSchedulesByProperty('pool', isPoolSortedAsc);
+                            isPoolSortedAsc = !isPoolSortedAsc;
+                        }} 
+                        aria-label="Sort by Pool">
+                        {isPoolSortedAsc ? '▲' : '▼'}
+                    </button>
+                </th>
+                <th>
+                    Swim Type
+                    <button 
+                        on:click={() => {
+                            sortSchedulesByProperty('swim_type', isSwimTypeSortedAsc);
+                            isSwimTypeSortedAsc = !isSwimTypeSortedAsc;
+                        }} 
+                        aria-label="Sort by Swim Type">
+                        {isSwimTypeSortedAsc ? '▲' : '▼'}
+                    </button>
+                </th>
                 <th>Day</th>
                 <th>
                     Start Time 
@@ -202,7 +261,7 @@
                 </th>
                 <th>End Time</th>
             </tr>
-        </thead>
+        </thead>               
         <tbody>
             {#each schedules as schedule}
                 <tr>
