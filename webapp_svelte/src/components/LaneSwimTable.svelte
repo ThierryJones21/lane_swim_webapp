@@ -67,7 +67,7 @@
     // Fetch swim types from backend
     const fetchSwimTypes = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/swim-types'); // Assuming an endpoint for swim types
+            const response = await axios.get('https://lane-swim-webapp.onrender.com/swim-types'); // Assuming an endpoint for swim types
             swimTypes = response.data; // Store swim types dynamically
         } catch (error) {
             console.error('Error fetching swim types:', error);
@@ -76,7 +76,7 @@
 
     const fetchSchedules = async () => {
         try {
-            const response = await axios.get('http://127.0.0.1:5000/schedules', {
+            const response = await axios.get('https://lane-swim-webapp.onrender.com/schedules', {
                 params: { 
                     'pool[]': poolFilter,
                     day: dayFilter,
