@@ -5,7 +5,7 @@ name: refresh database
 
 on:
   schedule:
-    - cron: "0 22 * * *"    # Runs at 1:00pm-2pm depending on daylight savings ET everyday
+    - cron: "30 14 * * *"    # Runs at 10:30am depending on daylight savings ET everyday
 jobs:
   getdataandrefreshmap:
     runs-on: ubuntu-latest
