@@ -57,6 +57,17 @@ def get_pools():
     
     return jsonify(pool_list)
 
+@app.route('/swim-types', methods=['GET'])
+def get_swim_types():
+    session = Session()
+    swim_types = session.query(LaneSwimSchedule.swim_type).distinct().all()
+    session.close()
+
+    # Extracting swim type names from the query result
+    swim_type_list = [swim_type[0] for swim_type in swim_types]
+    
+    return jsonify(swim_type_list)
+
 
 @app.route('/schedules', methods=['GET'])
 def get_schedules():
@@ -69,6 +80,11 @@ def get_schedules():
         # Get the list of pools and filter them
         pools = filters.getlist('pool[]')
         query = query.filter(LaneSwimSchedule.pool.in_(pools))
+    
+    if 'swim_type[]' in filters:
+        # Get the list of swim types and filter them
+        swim_types = filters.getlist('swim_type[]')
+        query = query.filter(LaneSwimSchedule.swim_type.in_(swim_types))
         
     if 'day' in filters:
         query = query.filter(LaneSwimSchedule.day.ilike(f"%{filters['day']}%"))
