@@ -1,11 +1,11 @@
 name: refresh database
 
 # for testing
-on: workflow_dispatch
+# on: workflow_dispatch
 
-# on:
-#   schedule:
-#     - cron: "30 14 * * *"    # Runs at 10:30am depending on daylight savings ET everyday
+on:
+  schedule:
+    - cron: "30 14 * * *"    # Runs at 10:30am depending on daylight savings ET everyday
 jobs:
   getdataandrefreshmap:
     runs-on: ubuntu-latest
