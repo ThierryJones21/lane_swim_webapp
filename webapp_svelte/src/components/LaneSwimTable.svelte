@@ -231,7 +231,7 @@
         <thead>
             <tr>
                 <th>
-                    Pool
+                    Facility
                     <button 
                         on:click={() => {
                             sortSchedulesByProperty('pool', isPoolSortedAsc);
@@ -242,7 +242,7 @@
                     </button>
                 </th>
                 <th>
-                    Swim Type
+                    Activity Type
                     <button 
                         on:click={() => {
                             sortSchedulesByProperty('swim_type', isSwimTypeSortedAsc);
