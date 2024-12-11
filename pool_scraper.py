@@ -8,9 +8,9 @@ from sqlalchemy.orm import sessionmaker
 import re
 from fuzzywuzzy import fuzz
 
-
 facility_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?page="
 url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/"
+mapbox_api_key = "pk.eyJ1IjoidGhpZXJyeWpvbmVzMjEiLCJhIjoiY20zdnlxZG03MHpzaDJqb2JiMnR4dWt6ZSJ9.cr_IvZqYAE9PujyFomE-GA"
 
 # Define the base class for SQLAlchemy
 Base = declarative_base()
@@ -26,6 +26,8 @@ class LaneSwimSchedule(Base):
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+    latitude = Column(String, nullable=False)
+    longitude = Column(String, nullable=False)
 
 # Define a new model to log script execution
 class ScriptLog(Base):
@@ -34,46 +36,6 @@ class ScriptLog(Base):
     id = Column(Integer, primary_key=True)
     script_name = Column(String, nullable=False)
     last_run_time = Column(String, nullable=False)
-
-    
-def get_pools():
-    pool_data = {}
-    for i in range(0,5):
-        page_url = facility_name_url + str(i)
-        print(page_url)
-        response = requests.get(page_url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Find the table within the div with class "table-responsive"
-            table_div = soup.find("div", class_="table-responsive")
-            table = table_div.find("table") if table_div else None
-            
-            if table:
-                for row in table.find_all('tr'):
-                    if row.find('td'):
-                        # Find the pool name link and address container
-                        name_tag = row.find('td', class_='views-field views-field-title').find('a')
-                        address_tag = row.find('td', class_='views-field views-field-field-address').find('p', class_='address')
-
-                        if name_tag and address_tag:
-                            # Get pool name
-                            pool_url = name_tag['href']
-                            pool_name = pool_url.split('/')[-1]
-                            
-                            # Get address details
-                            address_line = address_tag.find('span', class_='address-line1').get_text(strip=True)
-                            locality = address_tag.find('span', class_='locality').get_text(strip=True)
-                            admin_area = address_tag.find('span', class_='administrative-area').get_text(strip=True)
-                            postal_code = address_tag.find('span', class_='postal-code').get_text(strip=True)
-                            
-                            # Combine address components into a single string
-                            full_address = f"{address_line}, {locality}, {admin_area} {postal_code}, Canada"
-                            
-                            # Add to dictionary
-                            pool_data[pool_name] = full_address
-    print(pool_data)
-    return pool_data
 
 def parse_schedule_time(schedule_time):
     """Parse schedule times into start and end datetime objects."""
@@ -185,7 +147,7 @@ def validate_table_date_range(table):
     return False
     
 
-def extract_lane_swim_rows(table, pool_name, address, existing_types):
+def extract_lane_swim_rows(table, pool_name, address, lat, lng, existing_types):
     lane_swim_schedules = []
     
     if validate_table_date_range(table):
@@ -231,7 +193,9 @@ def extract_lane_swim_rows(table, pool_name, address, existing_types):
                                 'Swim Type': type_of_activity,
                                 'Day': day,
                                 'Start Time': start_end[0],  # Start time from tuple
-                                'End Time': start_end[1]     # End time from tuple
+                                'End Time': start_end[1],     # End time from tuple
+                                'Lat': lat,
+                                'Lng': lng
                             })
                 if type_of_activity not in existing_types:
                     existing_types.append(type_of_activity)
@@ -242,8 +206,73 @@ def extract_lane_swim_rows(table, pool_name, address, existing_types):
                         
     return lane_swim_schedules
 
-import requests
-from bs4 import BeautifulSoup
+# Get Pools Addresses and Lat Longs
+
+def geocode_address(address):
+    """
+    Geocode the address using Mapbox API and return latitude and longitude.
+    """
+    try:
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{requests.utils.quote(address)}.json"
+        params = {
+            "proximity": "-75.695000,45.4201",  # Proximity to Ottawa
+            "access_token": mapbox_api_key
+        }
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            features = response.json().get("features", [])
+            if features:
+                lng, lat = features[0]["geometry"]["coordinates"]
+                return {"lat": lat, "lng": lng}
+    except Exception as e:
+        print(f"Error geocoding address '{address}': {e}")
+    return None
+    
+def get_pools():
+    pool_data = {}
+    for i in range(0,5):
+        page_url = facility_name_url + str(i)
+        print(page_url)
+        response = requests.get(page_url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Find the table within the div with class "table-responsive"
+            table_div = soup.find("div", class_="table-responsive")
+            table = table_div.find("table") if table_div else None
+            
+            if table:
+                for row in table.find_all('tr'):
+                    if row.find('td'):
+                        # Find the pool name link and address container
+                        name_tag = row.find('td', class_='views-field views-field-title').find('a')
+                        address_tag = row.find('td', class_='views-field views-field-field-address').find('p', class_='address')
+
+                        if name_tag and address_tag:
+                            # Get pool name
+                            pool_url = name_tag['href']
+                            pool_name = pool_url.split('/')[-1]
+                            
+                            # Get address details
+                            address_line = address_tag.find('span', class_='address-line1').get_text(strip=True)
+                            locality = address_tag.find('span', class_='locality').get_text(strip=True)
+                            admin_area = address_tag.find('span', class_='administrative-area').get_text(strip=True)
+                            postal_code = address_tag.find('span', class_='postal-code').get_text(strip=True)
+                            
+                            # Combine address components into a single string
+                            full_address = f"{address_line}, {locality}, {admin_area} {postal_code}, Canada"
+                            
+                            # Geocode the address
+                            coordinates = geocode_address(full_address)
+                            
+                            # Add to dictionary
+                            pool_data[pool_name] = {
+                                "address": full_address,
+                                "lat": coordinates["lat"],
+                                "lng": coordinates["lng"]
+                            }
+
+    return pool_data
 
 def main():
     # List to hold all schedules
@@ -255,8 +284,12 @@ def main():
     pool_names = get_pools()
     
     # Iterate through each pool name
-    for pool_name, address in pool_names.items():
+    for pool_name, details in pool_names.items():
         response = requests.get(url + pool_name)
+        
+        address = details['address']
+        lat = details['lat']
+        lng = details['lng']
         
         if response.status_code == 200:
             response.encoding = 'utf-8'
@@ -268,7 +301,7 @@ def main():
             if tables:
                 for table in tables:
                     # If the table is part of the desired schedule, process it
-                    lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, existing_types)
+                    lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, lat, lng, existing_types)
                     all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
             else:
                 print(f"No schedule tables found for {pool_name.replace('-', ' ').title()}.")
@@ -308,7 +341,9 @@ def main():
                 swim_type=row['Swim Type'],
                 day=row['Day'],
                 start_time=row['Start Time'],
-                end_time=row['End Time']
+                end_time=row['End Time'],
+                latitude=row['Lat'],
+                longitude=row['Lng']
             )
             session.add(swim_schedule)
         session.commit()

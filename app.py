@@ -20,6 +20,8 @@ class LaneSwimSchedule(Base):
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
+    latitude = Column(String, nullable=False)
+    longitude = Column(String, nullable=False)
 
 class ScriptLog(Base):
     __tablename__ = 'script_log'
@@ -112,7 +114,10 @@ def get_schedules():
                'swim_type': sch.swim_type,
                'day': sch.day,
                'start_time': str(sch.start_time),
-               'end_time': str(sch.end_time)} for sch in schedules]
+               'end_time': str(sch.end_time),
+               'latitude': str(sch.latitude),
+               'longitude': str(sch.longitude)} 
+            for sch in schedules]
     
     return jsonify(result)
 
