@@ -5,7 +5,8 @@
     import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
 
     const mapboxApiKey = "pk.eyJ1IjoidGhpZXJyeWpvbmVzMjEiLCJhIjoiY20zdnlxZG03MHpzaDJqb2JiMnR4dWt6ZSJ9.cr_IvZqYAE9PujyFomE-GA";
-    const { GeolocateControl, NavigationControl, ScaleControl } = controls
+    const api_end_point = "https://lane-swim-webapp.onrender.com";
+    const { GeolocateControl, NavigationControl, ScaleControl } = controls;
 
     let schedules = [];
     let poolFilter = [];
@@ -24,40 +25,36 @@
     let brandColour = "rgb(255, 0, 0)";
 
     let isMapVisible = true;
+    let isDescriptionVisible = false;
+
+    function toggleDescriptionVisibility() {
+        isDescriptionVisible = !isDescriptionVisible;
+    }
 
     function toggleMapVisibility() {
         isMapVisible = !isMapVisible;
     }
 
-    const geocodeAddress = async (address) => {
-        try {
-            const geocodeResponse = await axios.get(`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(address)}.json&proximity=-75.695000,45.4201&access_token=${mapboxApiKey}`);
-            const features = geocodeResponse.data.features;
-            if (features.length > 0) {
-                const [lng, lat] = features[0].geometry.coordinates;
-                return { lat, lng };
-            }
-        } catch (error) {
-            console.error('Error geocoding address:', error);
-        }
-        return null;
-    };
-
-    
-
     const fetchLastRunTime = async () => {
         try {
-            const response = await axios.get("https://lane-swim-webapp.onrender.com/script-log");
+            const response = await axios.get(`${api_end_point}/script-log`);
             scriptLog = response.data;
         } catch (error) {
-            console.error('Error fetching last run time:', error);
+            console.error('Error fetching pools:', error);
         }
     };
+
+    function addToPoolFilter(poolName) {
+        if (!poolFilter.includes(poolName)) {
+            poolFilter = [...poolFilter, poolName];
+            fetchSchedules(); // Refresh schedules based on new filter
+        }
+    }
 
     // Fetching pools from the backend
     const fetchPools = async () => {
         try {
-            const response = await axios.get("https://lane-swim-webapp.onrender.com/pools");
+            const response = await axios.get(`${api_end_point}/pools`);
             pools = response.data;
         } catch (error) {
             console.error('Error fetching pools:', error);
@@ -67,7 +64,7 @@
     // Fetch swim types from backend
     const fetchSwimTypes = async () => {
         try {
-            const response = await axios.get('https://lane-swim-webapp.onrender.com/swim-types'); // Assuming an endpoint for swim types
+            const response = await axios.get(`${api_end_point}/swim-types`); // Assuming an endpoint for swim types
             swimTypes = response.data; // Store swim types dynamically
         } catch (error) {
             console.error('Error fetching swim types:', error);
@@ -76,21 +73,30 @@
 
     const fetchSchedules = async () => {
         try {
-            const response = await axios.get('https://lane-swim-webapp.onrender.com/schedules', {
+            // Fetch schedules with existing filters
+            const response = await axios.get(`${api_end_point}/schedules`, {
                 params: { 
                     'pool[]': poolFilter,
                     day: dayFilter,
                     start_time: startTimeFilter,
                     end_time: endTimeFilter,
-                    'swim_type[]': swimTypeFilter // Adding swim type filter
                 }
             });
-            schedules = response.data;
 
+            // Apply keyword filter for swim types locally
+            const keyword = swimTypeFilter.join(' ').toLowerCase(); // Combine filters as a single keyword
+            if (keyword) {
+                schedules = response.data.filter(schedule =>
+                    schedule.swim_type.toLowerCase().includes(keyword)
+                );
+            } else {
+                schedules = response.data; // No filtering if no keyword
+            }
+
+            // Update poolsDict for map markers
             poolsDict = {};
             for (const schedule of schedules) {
-                const { lat, lng } = await geocodeAddress(schedule.address);
-                poolsDict[schedule.pool] = { "name": schedule.pool, "lat": lat, "lng": lng };
+                poolsDict[schedule.pool] = { "name": schedule.pool, "lat": schedule.latitude, "lng": schedule.longitude };
             }
         } catch (error) {
             console.error('Error fetching schedules:', error);
@@ -129,6 +135,22 @@
         console.log('Map recentered:', e.detail.center);
     }
 </script>
+
+
+<div class="description-box">
+    <button class="toggle-description-button" on:click={toggleDescriptionVisibility}>
+        {isDescriptionVisible ? "How It Works ▲" : "How It Works ▼"}
+    </button>
+    {#if isDescriptionVisible}
+        <div class="description-content">
+            <ul>
+                <li>Type in the MultiSelect boxes and select create this option to filter by keywords</li>
+                <li>The map displays the facilities' locations based on filtering. Click on find my location on the top left of the map to show where you are.</li>
+                <li>Click on a facility name in the table to open its location in Google Maps.</li>
+            </ul>
+        </div>
+    {/if}
+</div>
 
 <h1>Ottawa Activity Schedules</h1>
 
@@ -219,7 +241,12 @@
         
         {#each Object.values(poolsDict) as pool}
             {#if pool.lat && pool.lng}
-                <Marker lat={pool.lat} lng={pool.lng} label={pool.name} color={brandColour} />
+                <Marker 
+                    lat={pool.lat} 
+                    lng={pool.lng} 
+                    label={pool.name} 
+                    color={brandColour} 
+                    on:click={() => addToPoolFilter(pool.name)} />
             {/if}
         {/each}
     </Map>
@@ -335,5 +362,39 @@
 
     .schedule-table-container {
         transition: opacity 0.3s ease;
+    }
+    .description-box {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        width: 15%;
+        z-index: 200; /* To ensure it sits above other elements */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .toggle-description-button {
+        background: none;
+        border: none;
+        color: rgb(255, 30, 0);
+        cursor: pointer;
+        font-size: 1.5em;
+        padding: 0;
+        margin-bottom: 10px;
+    }
+
+    .description-content ul {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 1.2em;
+    }
+
+    .description-content li {
+        margin-top: 20px;
+        margin-bottom: 5px;
+        justify-content: left;
     }
 </style>
