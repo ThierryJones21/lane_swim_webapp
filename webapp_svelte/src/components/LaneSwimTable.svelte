@@ -136,12 +136,12 @@
     }
 </script>
 
-
+<button class="toggle-description-button" on:click={toggleDescriptionVisibility}>
+    <img src="../../question-mark-circled-icon.png" alt="Help" class="help-icon" />
+</button>
+{#if isDescriptionVisible}
 <div class="description-box">
-    <button class="toggle-description-button" on:click={toggleDescriptionVisibility}>
-        {isDescriptionVisible ? "How It Works ▲" : "How It Works ▼"}
-    </button>
-    {#if isDescriptionVisible}
+    
         <div class="description-content">
             <ul>
                 <li>Type in the MultiSelect boxes and select create this option to filter by keywords</li>
@@ -149,8 +149,8 @@
                 <li>Click on a facility name in the table to open its location in Google Maps.</li>
             </ul>
         </div>
-    {/if}
 </div>
+{/if}
 
 <h1>Ottawa Activity Schedules</h1>
 
@@ -363,38 +363,42 @@
     .schedule-table-container {
         transition: opacity 0.3s ease;
     }
-    .description-box {
+    .toggle-description-button {
         position: absolute;
         top: 10px;
+        left: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    .help-icon {
+        width: 24px; /* Adjust as needed */
+        height: 24px; /* Adjust as needed */
+    }
+
+    .description-box {
+        position: absolute;
+        top: 50px; /* Adjusted to appear below the button */
         left: 10px;
         background-color: rgba(255, 255, 255, 0.8);
         padding: 10px;
         border: 1px solid #ccc;
         border-radius: 5px;
-        width: 15%;
+        width: 300px; /* Adjusted width for better readability */
         z-index: 200; /* To ensure it sits above other elements */
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .toggle-description-button {
-        background: none;
-        border: none;
-        color: rgb(255, 30, 0);
-        cursor: pointer;
-        font-size: 1.5em;
-        padding: 0;
-        margin-bottom: 10px;
     }
 
     .description-content ul {
         margin: 0;
         padding-left: 20px;
-        font-size: 1.2em;
+        font-size: 1em;
     }
 
     .description-content li {
-        margin-top: 20px;
+        margin-top: 10px;
         margin-bottom: 5px;
-        justify-content: left;
     }
 </style>
