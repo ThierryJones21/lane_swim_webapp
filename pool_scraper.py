@@ -22,6 +22,7 @@ class LaneSwimSchedule(Base):
     id = Column(Integer, primary_key=True)
     pool = Column(String, nullable=False)
     address = Column(String, nullable=False) 
+    link_to_page = Column(String, nullable=False) 
     swim_type = Column(String, nullable=False)
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
@@ -147,7 +148,7 @@ def validate_table_date_range(table):
     return False
     
 
-def extract_lane_swim_rows(table, pool_name, address, lat, lng, existing_types):
+def extract_lane_swim_rows(table, pool_name, address, linkToPage, lat, lng, existing_types):
     lane_swim_schedules = []
     
     if validate_table_date_range(table):
@@ -190,6 +191,7 @@ def extract_lane_swim_rows(table, pool_name, address, lat, lng, existing_types):
                             lane_swim_schedules.append({
                                 'Pool': pool_name,
                                 'Address': address, 
+                                'Link': linkToPage,
                                 'Swim Type': type_of_activity,
                                 'Day': day,
                                 'Start Time': start_end[0],  # Start time from tuple
@@ -268,6 +270,7 @@ def get_pools():
                             # Add to dictionary
                             pool_data[pool_name] = {
                                 "address": full_address,
+                                "linkToPage": pool_name,
                                 "lat": coordinates["lat"],
                                 "lng": coordinates["lng"]
                             }
@@ -288,6 +291,7 @@ def main():
         response = requests.get(url + pool_name)
         
         address = details['address']
+        linkToPage = details['linkToPage']
         lat = details['lat']
         lng = details['lng']
         
@@ -301,7 +305,7 @@ def main():
             if tables:
                 for table in tables:
                     # If the table is part of the desired schedule, process it
-                    lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, lat, lng, existing_types)
+                    lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, linkToPage, lat, lng, existing_types)
                     all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
             else:
                 print(f"No schedule tables found for {pool_name.replace('-', ' ').title()}.")
@@ -338,6 +342,7 @@ def main():
             swim_schedule = LaneSwimSchedule(
                 pool=row['Pool'],
                 address=row['Address'],
+                link_to_page=row['Link'],
                 swim_type=row['Swim Type'],
                 day=row['Day'],
                 start_time=row['Start Time'],

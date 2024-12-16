@@ -27,6 +27,12 @@
     let isMapVisible = true;
     let isDescriptionVisible = false;
 
+    $: {
+        console.log("Current poolsDict: ", poolsDict);
+        console.log("Map labels: ", Object.values(poolsDict).map(pool => pool.name));
+        console.log("Schedules",  schedules);
+    }
+
     function toggleDescriptionVisibility() {
         isDescriptionVisible = !isDescriptionVisible;
     }
@@ -43,13 +49,6 @@
             console.error('Error fetching pools:', error);
         }
     };
-
-    function addToPoolFilter(poolName) {
-        if (!poolFilter.includes(poolName)) {
-            poolFilter = [...poolFilter, poolName];
-            fetchSchedules(); // Refresh schedules based on new filter
-        }
-    }
 
     // Fetching pools from the backend
     const fetchPools = async () => {
@@ -83,21 +82,31 @@
                 }
             });
 
+            // Store fetched schedules
+            let fetchedSchedules = response.data;
+
             // Apply keyword filter for swim types locally
             const keyword = swimTypeFilter.join(' ').toLowerCase(); // Combine filters as a single keyword
             if (keyword) {
-                schedules = response.data.filter(schedule =>
+                fetchedSchedules = fetchedSchedules.filter(schedule =>
                     schedule.swim_type.toLowerCase().includes(keyword)
                 );
-            } else {
-                schedules = response.data; // No filtering if no keyword
             }
 
-            // Update poolsDict for map markers
+            // Update schedules after all filters
+            schedules = fetchedSchedules;
+
+            // Rebuild poolsDict to reflect the filtered schedules
             poolsDict = {};
             for (const schedule of schedules) {
-                poolsDict[schedule.pool] = { "name": schedule.pool, "lat": schedule.latitude, "lng": schedule.longitude };
+                poolsDict[schedule.pool] = {
+                    name: schedule.pool,
+                    lat: schedule.latitude,
+                    lng: schedule.longitude,
+                };
             }
+
+            console.log("Updated poolsDict: ", poolsDict);
         } catch (error) {
             console.error('Error fetching schedules:', error);
         }
@@ -122,14 +131,15 @@
 
 
     onMount(() => {
+        fetchSchedules(); // Fetch schedules initially
         fetchPools(); // Fetch pools when the component mounts
         fetchSwimTypes(); // Fetch swim types when the component mounts
-        fetchSchedules(); // Fetch schedules initially
         fetchLastRunTime();
         if (mapComponent) {
             mapComponent.setCenter([ '-75.695000', '45.4201'], 4);
         }
     });
+    
 
     function handleRecentre(e) {
         console.log('Map recentered:', e.detail.center);
@@ -139,17 +149,22 @@
 <button class="toggle-description-button" on:click={toggleDescriptionVisibility}>
     <img src="../../question-mark-circled-icon.png" alt="Help" class="help-icon" />
 </button>
+{#if isDescriptionVisible}<button class="toggle-description-button" on:click={toggleDescriptionVisibility}>
+    <img src="../../question-mark-circled-icon.png" alt="Help" class="help-icon" />
+</button>
 {#if isDescriptionVisible}
 <div class="description-box">
+    
     
         <div class="description-content">
             <ul>
                 <li>Type in the MultiSelect boxes and select create this option to filter by keywords</li>
                 <li>The map displays the facilities' locations based on filtering. Click on find my location on the top left of the map to show where you are.</li>
-                <li>Click on a facility name in the table to open its location in Google Maps.</li>
+                <li>Click on a facility name in the table to open the Ottawa Recreation Web Page.</li>
             </ul>
         </div>
 </div>
+{/if}
 {/if}
 
 <h1>Ottawa Activity Schedules</h1>
@@ -241,16 +256,24 @@
         
         {#each Object.values(poolsDict) as pool}
             {#if pool.lat && pool.lng}
-                <Marker 
-                    lat={pool.lat} 
-                    lng={pool.lng} 
-                    label={pool.name} 
-                    color={brandColour} 
-                    on:click={() => addToPoolFilter(pool.name)} />
+                <Marker lat={pool.lat} lng={pool.lng} color={brandColour}>
+                    <div class="content" slot="popup">
+                      <h3>{pool.name}</h3>
+                        <div>
+                        <a href="https://www.google.com/maps/search/?api=1&query={pool.name}" target="_blank">
+                            Google Maps Directions
+                        </a>
+                        </div>
+                    </div>
+                </Marker>
             {/if}
         {/each}
     </Map>
 </div>
+
+<!-- Added disclamer -->
+<p style="font-size: 0.9em;"><strong>Disclamer: </strong>The information contained in this website is based on the City of Ottawa’s website, and may contain errors. Users of the website should make sure they check the schedules with each facility, or their web page.</p>
+
 
 <!-- Schedule Table -->
 <div class="schedule-table-container">
@@ -258,7 +281,7 @@
         <thead>
             <tr>
                 <th>
-                    Facility
+                    Facility <strong style="font-weight:normal">(Link To City of Ottawa Web Page)</strong>
                     <button 
                         on:click={() => {
                             sortSchedulesByProperty('pool', isPoolSortedAsc);
@@ -292,7 +315,7 @@
         <tbody>
             {#each schedules as schedule}
                 <tr>
-                    <td><a href="https://www.google.com/maps/search/?api=1&query={schedule.address}" target="_blank">{schedule.pool}</a></td>
+                    <td><a href="https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/{schedule.link}" target="_blank">{schedule.pool}</a></td>
                     <td>{schedule.swim_type}</td>
                     <td>{schedule.day}</td>
                     <td>{schedule.start_time}</td>
@@ -310,7 +333,7 @@
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { cursor: pointer; }
     div { margin-bottom: 1rem; }
-    
+
     /* Centering the filters */
     .filters {
         display: flex;
@@ -382,10 +405,26 @@
         position: absolute;
         top: 50px; /* Adjusted to appear below the button */
         left: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    .help-icon {
+        width: 24px; /* Adjust as needed */
+        height: 24px; /* Adjust as needed */
+    }
+
+    .description-box {
+        position: absolute;
+        top: 50px; /* Adjusted to appear below the button */
+        left: 10px;
         background-color: rgba(255, 255, 255, 0.8);
         padding: 10px;
         border: 1px solid #ccc;
         border-radius: 5px;
+        width: 300px; /* Adjusted width for better readability */
         width: 300px; /* Adjusted width for better readability */
         z-index: 200; /* To ensure it sits above other elements */
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -395,9 +434,11 @@
         margin: 0;
         padding-left: 20px;
         font-size: 1em;
+        font-size: 1em;
     }
 
     .description-content li {
+        margin-top: 10px;
         margin-top: 10px;
         margin-bottom: 5px;
     }
