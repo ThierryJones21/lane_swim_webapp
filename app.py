@@ -16,6 +16,7 @@ class LaneSwimSchedule(Base):
     id = Column(Integer, primary_key=True)
     pool = Column(String, nullable=False)
     address = Column(String, nullable=False)
+    link_to_page = Column(String, nullable=False) 
     swim_type = Column(String, nullable=False)
     day = Column(String, nullable=False)
     start_time = Column(Time, nullable=False)
@@ -111,6 +112,7 @@ def get_schedules():
     result = [{'id': sch.id,
                'pool': sch.pool,
                'address': sch.address,
+               'link' : sch.link_to_page,
                'swim_type': sch.swim_type,
                'day': sch.day,
                'start_time': str(sch.start_time),
