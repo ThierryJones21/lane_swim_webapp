@@ -50,13 +50,6 @@
         }
     };
 
-    function addToPoolFilter(poolName) {
-        if (!poolFilter.includes(poolName)) {
-            poolFilter = [...poolFilter, poolName];
-            fetchSchedules(); // Refresh schedules based on new filter
-        }
-    }
-
     // Fetching pools from the backend
     const fetchPools = async () => {
         try {
@@ -164,8 +157,6 @@
                 <li>Type in the MultiSelect boxes and select create this option to filter by keywords</li>
                 <li>The map displays the facilities' locations based on filtering. Click on find my location on the top left of the map to show where you are.</li>
                 <li>Click on a facility name in the table to open the Ottawa Recreation Web Page.</li>
-                <!-- Added disclamer -->
-                <li style="font-size: 0.7em;">The information contained in this website is based on the City of Ottawa’s website, and may contain errors. Users of the website should make sure they check the schedules with each facility, or their web page.</li>
             </ul>
         </div>
 </div>
@@ -260,12 +251,12 @@
         
         {#each Object.values(poolsDict) as pool}
             {#if pool.lat && pool.lng}
-                <Marker lat={pool.lat} lng={pool.lng} color={brandColour} >
+                <Marker lat={pool.lat} lng={pool.lng} color={brandColour}>
                     <div class="content" slot="popup">
                       <h3>{pool.name}</h3>
                         <div>
                         <a href="https://www.google.com/maps/search/?api=1&query={pool.name}" target="_blank">
-                            {pool.name}
+                            Google Maps Directions
                         </a>
                         </div>
                     </div>
@@ -275,13 +266,17 @@
     </Map>
 </div>
 
+<!-- Added disclamer -->
+<p style="font-size: 0.9em;"><strong>Disclamer: </strong>The information contained in this website is based on the City of Ottawa’s website, and may contain errors. Users of the website should make sure they check the schedules with each facility, or their web page.</p>
+
+
 <!-- Schedule Table -->
 <div class="schedule-table-container">
     <table>
         <thead>
             <tr>
                 <th>
-                    Facility
+                    Facility <strong style="font-weight:normal">(Link To City of Ottawa Web Page)</strong>
                     <button 
                         on:click={() => {
                             sortSchedulesByProperty('pool', isPoolSortedAsc);
@@ -290,9 +285,6 @@
                         aria-label="Sort by Pool">
                         {isPoolSortedAsc ? '▲' : '▼'}
                     </button>
-                </th>
-                <th>
-                    Ottawa Web Page
                 </th>
                 <th>
                     Activity Type
@@ -336,7 +328,7 @@
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
     th { cursor: pointer; }
     div { margin-bottom: 1rem; }
-    
+
     /* Centering the filters */
     .filters {
         display: flex;
