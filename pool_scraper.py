@@ -6,11 +6,16 @@ from sqlalchemy import create_engine, Column, String, Time, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import re
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import fuzz, process
 
 facility_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?page="
 url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/"
 mapbox_api_key = "pk.eyJ1IjoidGhpZXJyeWpvbmVzMjEiLCJhIjoiY20zdnlxZG03MHpzaDJqb2JiMnR4dWt6ZSJ9.cr_IvZqYAE9PujyFomE-GA"
+
+corrections = [
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december"
+        ]
 
 # Define the base class for SQLAlchemy
 Base = declarative_base()
@@ -98,6 +103,14 @@ def parse_date(date_str, default_year):
     except ValueError:
         return None
 
+def correct_spelling(word, corrections):
+    if word in corrections:
+        return word
+    match, score = process.extractOne(word, corrections)
+    if score > 65:  # Adjust the threshold as needed
+        return match
+    return word
+
 def validate_table_date_range(table):
     """
     Validate table data with caption date range when comparing it to today's date.
@@ -114,13 +127,16 @@ def validate_table_date_range(table):
         # print(f"Caption: {caption}")
         
         matches = re.findall(date_pattern, caption)
+    
         
         if matches:
             for match in matches:
-                # print(f"Found match: {match}")
+                start_date_str, end_date_str = match
+                # Correct the month names in the matches
+                start_date_str = correct_spelling(start_date_str.split()[0], corrections) + " " + start_date_str.split()[1]
+                end_date_str = correct_spelling(end_date_str.split()[0], corrections) + " " + end_date_str.split()[1]
                 try:
-                    start_date_str, end_date_str = match
-                    
+
                     # Use the current year if no year is provided
                     if ',' in start_date_str:
                         start_date = parse_date(start_date_str, today.year)
