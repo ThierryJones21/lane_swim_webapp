@@ -33,6 +33,7 @@ Ensure both `python` and `node` are in your system path.
    pip install -r requirements.txt
    ```
    ```bash
+   export MAPBOX_API_KEY=<your-key>
    python pool_scraper.py
    ```
 

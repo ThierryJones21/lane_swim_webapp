@@ -23,6 +23,7 @@ class LaneSwimSchedule(Base):
     end_time = Column(Time, nullable=False)
     latitude = Column(String, nullable=False)
     longitude = Column(String, nullable=False)
+    vacation = Column(String, nullable=True)
 
 class ScriptLog(Base):
     __tablename__ = 'script_log'
@@ -118,7 +119,8 @@ def get_schedules():
                'start_time': str(sch.start_time),
                'end_time': str(sch.end_time),
                'latitude': str(sch.latitude),
-               'longitude': str(sch.longitude)} 
+               'longitude': str(sch.longitude),
+               'vacation': str(sch.vacation)} 
             for sch in schedules]
     
     return jsonify(result)

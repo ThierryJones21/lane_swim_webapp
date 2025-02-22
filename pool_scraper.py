@@ -7,10 +7,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import re
 from fuzzywuzzy import fuzz, process
+import os
 
 facility_name_url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?page="
 url = "https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/"
-mapbox_api_key = "pk.eyJ1IjoidGhpZXJyeWpvbmVzMjEiLCJhIjoiY20zdnlxZG03MHpzaDJqb2JiMnR4dWt6ZSJ9.cr_IvZqYAE9PujyFomE-GA"
+mapbox_api_key = os.getenv("MAPBOX_API_KEY")
 
 corrections = [
             "january", "february", "march", "april", "may", "june",
@@ -34,6 +35,7 @@ class LaneSwimSchedule(Base):
     end_time = Column(Time, nullable=False)
     latitude = Column(String, nullable=False)
     longitude = Column(String, nullable=False)
+    vacation = Column(String, nullable=True)
 
 # Define a new model to log script execution
 class ScriptLog(Base):
@@ -164,13 +166,23 @@ def validate_table_date_range(table):
     return False
     
 
-def extract_lane_swim_rows(table, pool_name, address, linkToPage, lat, lng, existing_types):
+def extract_lane_swim_rows(table, pool_name, address, linkToPage, lat, lng, existing_types, vacation_schedule):
     lane_swim_schedules = []
     
-    if validate_table_date_range(table):
+    # Extract vacation schedule if found bool should be true
+    vacation_schedule_text = vacation_schedule[0]
+    vacation_schedule_bool = vacation_schedule[1]
+    
+    if validate_table_date_range(table) or vacation_schedule_bool:
         # Iterate through each row in the table body 
         # debug statement to print only tables that have valid date ranges   
         # print(table.find("caption"))
+        caption = table.find("caption")
+        if caption and vacation_schedule_bool:
+            caption = caption.text.encode("utf-8", "ignore").decode("utf-8")
+            caption = caption.replace("\u202f", " ").replace("\xa0", " ").lower()
+            vacation_schedule_text = vacation_schedule_text + " " + caption
+            
         for row in table.find_all("tr"):
             header = row.find("th")  # Get the header cell 
             if header:
@@ -213,7 +225,8 @@ def extract_lane_swim_rows(table, pool_name, address, linkToPage, lat, lng, exis
                                 'Start Time': start_end[0],  # Start time from tuple
                                 'End Time': start_end[1],     # End time from tuple
                                 'Lat': lat,
-                                'Lng': lng
+                                'Lng': lng,
+                                'Vacation': vacation_schedule_text  # Add vacation schedule if found else None
                             })
                 if type_of_activity not in existing_types:
                     existing_types.append(type_of_activity)
@@ -315,16 +328,26 @@ def main():
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Find all tables within the page (not just the first one inside "table-responsive")
-            tables = soup.find_all("table")
-            
-            if tables:
-                for table in tables:
-                    # If the table is part of the desired schedule, process it
-                    lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, linkToPage, lat, lng, existing_types)
-                    all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
-            else:
-                print(f"No schedule tables found for {pool_name.replace('-', ' ').title()}.")
+            # Find all collapsible regions 
+            collapse_regions = soup.find_all("div", {"class": "collapse-region"})
+            if collapse_regions:
+                for region in collapse_regions:
+                    # Find buttons withing the collapsable region to parse through text outlining breaks such as holidays "March Break", "Christmas Break"
+                    vacation_schedule = [None, False]
+                    collapsible_button = region.find("button", {"data-toggle": "collapse"})
+                    if collapsible_button:
+                        collapsible_buttons_text = collapsible_button.text.encode("utf-8", "ignore").decode("utf-8")
+                        if "schedule" and "break" in collapsible_buttons_text.lower():
+                            vacation_schedule = [collapsible_buttons_text.lower(), True]
+                        
+                    tables = region.find_all("table")     
+                    if tables:
+                        for table in tables:
+                            # If the table is part of the desired schedule, process it
+                            lane_swim_schedules = extract_lane_swim_rows(table, pool_name.replace('-', ' ').title(), address, linkToPage, lat, lng, existing_types, vacation_schedule)
+                            all_lane_swim_schedules.extend(lane_swim_schedules)  # Collect all schedules
+                    else:
+                        print(f"No schedule tables found for {pool_name.replace('-', ' ').title()}.")
         else:
             print(f"Failed to retrieve data for {pool_name.replace('-', ' ').title()}. Status code: {response.status_code}")
     
@@ -364,7 +387,8 @@ def main():
                 start_time=row['Start Time'],
                 end_time=row['End Time'],
                 latitude=row['Lat'],
-                longitude=row['Lng']
+                longitude=row['Lng'],
+                vacation=row['Vacation']
             )
             session.add(swim_schedule)
         session.commit()
