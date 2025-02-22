@@ -19,6 +19,8 @@ jobs:
           python-version: 3.9
 
       - name: Install dependencies and Execute Python script
+        env:
+          MAPBOX_API_KEY: ${{ secrets.MAPBOX_API_KEY }}
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           python pool_scraper.py
