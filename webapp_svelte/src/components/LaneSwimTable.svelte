@@ -17,6 +17,7 @@
     let swimTypes = []; // Store swim types
     let isStartTimeSortedAsc = true;
     let isPoolSortedAsc = true;
+    let isVacationSortedAsc = true;
     let isSwimTypeSortedAsc =true;
     let pools = [];
     let poolsDict = {};
@@ -125,6 +126,14 @@
         schedules = schedules.slice().sort((a, b) => {
             const valueA = a[property].toLowerCase();
             const valueB = b[property].toLowerCase();
+            return isAsc ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+        });
+    };
+
+    const sortSchedulesByVacation = (vacation, isAsc) => {
+        schedules = schedules.slice().sort((a, b) => {
+            const valueA = a[vacation].toLowerCase();
+            const valueB = b[vacation].toLowerCase();
             return isAsc ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
         });
     };
@@ -310,6 +319,17 @@
                     </button>
                 </th>
                 <th>End Time</th>
+                <th style="width: 15%;">
+                    Vacation Schedules
+                    <button 
+                        on:click={() => {
+                            sortSchedulesByVacation('vacation', isVacationSortedAsc);
+                            isVacationSortedAsc = !isVacationSortedAsc;
+                        }} 
+                        aria-label="Sort by Vacation">
+                        {isVacationSortedAsc ? '▲' : '▼'}
+                    </button>
+                </th>
             </tr>
         </thead>               
         <tbody>
@@ -320,6 +340,13 @@
                     <td>{schedule.day}</td>
                     <td>{schedule.start_time}</td>
                     <td>{schedule.end_time}</td>
+                    <td>
+                        {#if schedule.vacation == "None"}
+                            Current
+                        {:else}
+                            {schedule.vacation}
+                        {/if}
+                    </td>
                 </tr>
             {/each}
         </tbody>

@@ -13,7 +13,7 @@ This project provides a comprehensive lane swim schedule dashboard for swimmers 
 ## Live Deployment
 
 The application is live and accessible here:  
-[Ottawa Lane Swim Scheduler](https://lane-swim-webapp.vercel.app/)
+[Ottawa Lane Swim Scheduler](https://ottawaactivities.ca/)
 
 ## Project Structure
 
