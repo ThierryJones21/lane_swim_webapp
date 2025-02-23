@@ -3,6 +3,7 @@
     import axios from 'axios';
     import MultiSelect from 'svelte-multiselect';
     import { Map, Marker, controls } from '@beyonk/svelte-mapbox';
+    import UserReview from './UserReview.svelte';
     
     const mapboxApiKey = process.env.VITE_PUBLIC_MAPBOX_API_KEY;
     const api_end_point = "http://127.0.0.1:5000";
@@ -24,14 +25,22 @@
     let scriptLog = {};
     let mapComponent;
     let brandColour = "rgb(255, 0, 0)";
+    let userLocation = null;
+    let nearestPool = null;
+    let nearestDistance = null; 
 
     let isMapVisible = true;
     let isDescriptionVisible = false;
+    let isUserReviewVisible = false;
 
     $: {
         console.log("Current poolsDict: ", poolsDict);
         console.log("Map labels: ", Object.values(poolsDict).map(pool => pool.name));
         console.log("Schedules",  schedules);
+    }
+
+    function toggleUserReviewVisibility() {
+        isUserReviewVisible = !isUserReviewVisible;
     }
 
     function toggleDescriptionVisibility() {
@@ -40,6 +49,50 @@
 
     function toggleMapVisibility() {
         isMapVisible = !isMapVisible;
+    }
+
+    function getUserLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                findNearestPool();
+            }, error => {
+                console.error("Error getting location:", error);
+            });
+        } else {
+            console.error("Geolocation is not supported by this browser.");
+        }
+    }
+
+    function findNearestPool() {
+        if (!userLocation || Object.keys(poolsDict).length === 0) return;
+
+        let minDistance = Infinity;
+        let closestPool = null;
+
+        for (const pool of Object.values(poolsDict)) {
+            const distance = calculateDistance(userLocation.lat, userLocation.lng, pool.lat, pool.lng);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPool = pool;
+            }
+        }
+        nearestPool = closestPool;
+        nearestDistance = minDistance.toFixed(2);
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radius of the Earth in km
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in km
     }
 
     const fetchLastRunTime = async () => {
@@ -64,8 +117,8 @@
     // Fetch swim types from backend
     const fetchSwimTypes = async () => {
         try {
-            const response = await axios.get(`${api_end_point}/swim-types`); // Assuming an endpoint for swim types
-            swimTypes = response.data; // Store swim types dynamically
+            const response = await axios.get(`${api_end_point}/swim-types`); // Assuming an endpoint for swim types activity type as well
+            swimTypes = response.data; 
         } catch (error) {
             console.error('Error fetching swim types:', error);
         }
@@ -108,6 +161,7 @@
             }
 
             console.log("Updated poolsDict: ", poolsDict);
+            getUserLocation();
         } catch (error) {
             console.error('Error fetching schedules:', error);
         }
@@ -147,6 +201,7 @@
         if (mapComponent) {
             mapComponent.setCenter([ '-75.695000', '45.4201'], 4);
         }
+        getUserLocation(); // Get user location when the component mounts
     });
     
 
@@ -154,10 +209,19 @@
         console.log('Map recentered:', e.detail.center);
     }
 </script>
-
+<header class="header">
+    <a href="https://github.com/ThierryJones21/lane_swim_webapp/tree/dev" target="_blank" class="github-link" title="View on GitHub">
+        <svg viewBox="0 0 24 24" class="github-icon">
+            <path fill="currentColor" d="M12 0C5.37 0 0 5.373 0 12c0 5.303 3.438 9.8 8.207 11.385.6.11.793-.26.793-.577v-2.16c-3.338.726-4.042-1.416-4.042-1.416-.546-1.387-1.333-1.755-1.333-1.755-1.09-.745.082-.73.082-.73 1.204.085 1.838 1.235 1.838 1.235 1.07 1.834 2.805 1.304 3.49.997.108-.775.42-1.304.762-1.604-2.665-.304-5.466-1.335-5.466-5.93 0-1.31.467-2.382 1.235-3.222-.124-.303-.535-1.524.118-3.176 0 0 1.008-.322 3.302 1.23a11.517 11.517 0 0 1 3.004-.404c1.02.004 2.045.138 3.004.404 2.294-1.552 3.3-1.23 3.3-1.23.654 1.652.244 2.873.12 3.176.77.84 1.233 1.912 1.233 3.222 0 4.608-2.805 5.622-5.475 5.921.43.37.816 1.102.816 2.222v3.293c0 .32.192.693.8.576C20.565 21.796 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+        </svg>
+    </a>
+</header>
 <button class="toggle-description-button" on:click={toggleDescriptionVisibility}>
     <img src="../../question-mark-circled-icon.png" alt="Help" class="help-icon" />
 </button>
+
+<button on:click={toggleUserReviewVisibility} class="toggle-user-reviews-button">Leave a review</button>
+
 {#if isDescriptionVisible}
 <div class="description-box">
     
@@ -170,11 +234,21 @@
         </div>
 </div>
 {/if}
+{#if isUserReviewVisible}
+    <UserReview/>
+{/if}
 
 <h1>Ottawa Activity Schedules</h1>
 
 <div class="script-log">
-    <p><strong>Last Updated:</strong> {scriptLog.last_run_time ? `${scriptLog.last_run_time} (Script: ${scriptLog.script_name})` : "Fetching..."}</p>
+    {#if !scriptLog.last_run_time}
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p><strong>Fetching Database Estimated Wait Time:</strong> 1-2 minutes...</p>
+        </div>
+    {:else}
+        <p><strong>Last Updated:</strong> {scriptLog.last_run_time} (Script: {scriptLog.script_name})</p>
+    {/if}
 </div>
 
 <div class="filters">
@@ -236,6 +310,10 @@
     </div>
 </div>
 
+{#if nearestPool}
+    <p><strong>Nearest Facility:</strong> {nearestPool.name} ({nearestDistance} km away)</p>
+{/if}
+
 <div>
     <!-- Toggle Button -->
     <button class="toggle-map-button" on:click={toggleMapVisibility}>
@@ -277,7 +355,6 @@
 
 <!-- Added disclamer -->
 <p style="font-size: 0.9em;"><strong>Disclamer: </strong>The information contained in this website is based on the City of Ottawa’s website, and may contain errors. Users of the website should make sure they check the schedules with each facility, or their web page.</p>
-
 
 <!-- Schedule Table -->
 <div class="schedule-table-container">
@@ -410,8 +487,8 @@
     }
     .toggle-description-button {
         position: absolute;
-        top: 10px;
-        left: 10px;
+        top: 20px;
+        left: 15px;
         background: none;
         border: none;
         cursor: pointer;
@@ -426,7 +503,7 @@
     .description-box {
         position: absolute;
         top: 50px; /* Adjusted to appear below the button */
-        left: 10px;
+        left: 10px; 
         background-color: rgba(255, 255, 255, 0.8);
         padding: 10px;
         border: 1px solid #ccc;
@@ -445,5 +522,56 @@
     .description-content li {
         margin-top: 10px;
         margin-bottom: 5px;
+    }
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(0, 0, 0, 0.3);
+        border-top-color: #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px;
+        position: relative;
+    }
+
+    .github-link {
+        position: absolute;
+        top: 1px;
+        right: 5px;
+        color: black;
+        text-decoration: none;
+    }
+
+    .github-icon {
+        width: 30px;
+        height: 30px;
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .github-icon:hover {
+        transform: scale(1.1);
+    }
+    .toggle-user-reviews-button {
+        position: absolute;
+        top: 50px;
+        left: 10px;
     }
 </style>
