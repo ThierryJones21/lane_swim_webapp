@@ -271,20 +271,20 @@ def get_pools():
         response = requests.get(page_url, headers=headers)
         print(page_url, response.status_code)
 
-        # 403 banned error fix
-        if response.status_code != 200:
-            while attempts < 3:
-                response = requests.get(page_url, headers=headers)
-                print(page_url, response.status_code)
+        # # 403 banned error fix
+        # if response.status_code != 200:
+        #     while attempts < 3:
+        #         response = requests.get(page_url, headers=headers)
+        #         print(page_url, response.status_code)
 
-                if response.status_code == 403:
-                    print(f"⚠️ Hit 403 — backing off, attempt {attempts+1}...")
-                    time.sleep(5 + attempts * 5)  # 5, 10, 15 sec backoff
-                    attempts += 1
-                    continue
-                else:
-                    # Success, exit retry loop
-                    break
+        #         if response.status_code == 403:
+        #             print(f"⚠️ Hit 403 — backing off, attempt {attempts+1}...")
+        #             time.sleep(5 + attempts * 5)  # 5, 10, 15 sec backoff
+        #             attempts += 1
+        #             continue
+        #         else:
+        #             # Success, exit retry loop
+        #             break
 
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
