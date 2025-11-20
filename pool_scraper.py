@@ -261,16 +261,40 @@ def geocode_address(address):
     
 def get_pools():
     pool_data = {}
+    headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
     for i in range(0,5):
         page_url = facility_name_url + str(i)
-        print(page_url)
-        response = requests.get(page_url)
+        response = requests.get(page_url, headers=headers)
+        print(page_url, response.status_code)
+
+        # 403 banned error fix
+        if response.status_code != 200:
+            while attempts < 3:
+                response = requests.get(page_url, headers=headers)
+                print(page_url, response.status_code)
+
+                if response.status_code == 403:
+                    print(f"⚠️ Hit 403 — backing off, attempt {attempts+1}...")
+                    time.sleep(5 + attempts * 5)  # 5, 10, 15 sec backoff
+                    attempts += 1
+                    continue
+                else:
+                    # Success, exit retry loop
+                    break
+
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
             
             # Find the table within the div with class "table-responsive"
             table_div = soup.find("div", class_="table-responsive")
             table = table_div.find("table") if table_div else None
+
+            print(table)
+            print(response.content)
             
             if table:
                 for row in table.find_all('tr'):
@@ -292,6 +316,8 @@ def get_pools():
                             
                             # Combine address components into a single string
                             full_address = f"{address_line}, {locality}, {admin_area} {postal_code}, Canada"
+
+                            print(full_address)
                             
                             # Geocode the address
                             coordinates = geocode_address(full_address)
